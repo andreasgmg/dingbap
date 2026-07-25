@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{if .NotFound}}Link unavailable{{else if .NeedPass}}Unlock · {{.Name}}{{else}}{{.Name}}{{end}} · dingbap</title>
+<style>
+:root{--bg:#0f1419;--panel:#1a222c;--border:#2a3544;--text:#e7eef7;--muted:#8b9bb0;--accent:#3d8bfd;--danger:#e85d5d;--hover:#243041}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1200px 600px at 20% -10%,#1a2a44 0%,var(--bg) 55%);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+.wrap{width:min(720px,92vw);margin:3rem auto;padding:0 0 3rem}
+.brand{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.35rem 1.4rem;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+h1{font-size:1.15rem;font-weight:650;margin-bottom:.35rem;word-break:break-word}
+.sub{color:var(--muted);font-size:.85rem;margin-bottom:1.1rem;line-height:1.45}
+.meta{color:var(--muted);font-size:.8rem;margin:-.5rem 0 1rem}
+.err{background:rgba(232,93,93,.12);border:1px solid rgba(232,93,93,.35);color:#ffb4b4;padding:.65rem .75rem;border-radius:8px;font-size:.82rem;margin-bottom:.9rem}
+label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:.35rem}
+input[type=password]{width:100%;padding:.7rem .8rem;border-radius:8px;border:1px solid var(--border);background:#121820;color:var(--text);font-size:.9rem;margin-bottom:.9rem}
+input:focus{outline:none;border-color:var(--accent)}
+button,.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem .95rem;border-radius:8px;border:1px solid var(--border);background:var(--accent);color:#fff;font-size:.85rem;font-weight:560;cursor:pointer;text-decoration:none;font-family:inherit}
+button:hover,.btn:hover{filter:brightness(1.08)}
+.btn.secondary{background:#243041;color:var(--text)}
+.actions{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
+.list{list-style:none;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.list li{display:flex;align-items:center;gap:.75rem;padding:.65rem .8rem;border-bottom:1px solid var(--border)}
+.list li:last-child{border-bottom:none}
+.list a{color:var(--text);text-decoration:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list a:hover{color:var(--accent)}
+.badge{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.size{color:var(--muted);font-size:.75rem;flex-shrink:0}
+.up{margin-bottom:.75rem}
+.up a{color:var(--muted);font-size:.82rem;text-decoration:none}
+.up a:hover{color:var(--accent)}
+.empty{color:var(--muted);font-size:.88rem;padding:1.2rem 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">dingbap share</div>
+  <div class="card">
+    {{if .NotFound}}
+      <h1>Link expired or not found</h1>
+      <p class="sub">{{if .Error}}{{.Error}}{{else}}This share is no longer available. It may have expired, reached its download limit, been revoked, or the file was removed.{{end}}</p>
+    {{else if .NeedPass}}
+      <h1>{{.Name}}</h1>
+      <p class="sub">This link is password-protected.</p>
+      {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+      <form method="post" action="/s/{{.Token}}/unlock">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+        <button type="submit">Unlock</button>
+      </form>
+    {{else if .IsDir}}
+      <h1>{{.Name}}</h1>
+      <p class="sub">Shared folder</p>
+      {{if .ParentURL}}
+      <div class="up"><a href="{{.ParentURL}}">← Up</a></div>
+      {{end}}
+      <div class="actions">
+        {{if .ZipURL}}<a class="btn" href="{{.ZipURL}}">Download ZIP</a>{{end}}
+      </div>
+      {{if .Entries}}
+      <ul class="list">
+        {{range .Entries}}
+        <li>
+          <span class="badge">{{if .IsDir}}folder{{else}}file{{end}}</span>
+          <a href="{{.URL}}">{{.Name}}</a>
+          {{if not .IsDir}}<span class="size">{{.Size}}</span>{{end}}
+        </li>
+        {{end}}
+      </ul>
+      {{else}}
+      <p class="empty">This folder is empty.</p>
+      {{end}}
+    {{else}}
+      <h1>{{.Name}}</h1>
+      <p class="sub">Shared file</p>
+      {{if .Size}}<p class="meta">{{.Size}}</p>{{end}}
+      <div class="actions">
+        <a class="btn" href="{{.DownloadURL}}">Download</a>
+      </div>
+    {{end}}
+  </div>
+</div>
+</body>
+</html>

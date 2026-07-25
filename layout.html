@@ -1,0 +1,2012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{if .Admin}}Admin - {{end}}dingbap</title>
+<style>
+:root {
+  --bg-primary: #0e1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2128;
+  --bg-hover: #1f2937;
+  --bg-active: #1a2332;
+  --border: #21262d;
+  --border-light: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --accent-bg: rgba(56,139,253,.1);
+  --danger: #f85149;
+  --danger-bg: rgba(248,81,73,.1);
+  --success: #3fb950;
+  --success-bg: rgba(63,185,80,.1);
+  --warning: #d29922;
+  --sidebar-width: 280px;
+  --header-height: 52px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+
+
+svg.icon{width:1em;height:1em;stroke:currentColor;fill:none;flex-shrink:0;display:inline-block;vertical-align:-0.15em}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg-primary);color:var(--text-primary);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+
+.header{height:var(--header-height);background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.header-left{display:flex;align-items:center;gap:.75rem}
+.header h1{font-size:.95rem;font-weight:600;display:flex;align-items:center;gap:.5rem}
+.header h1 svg.icon{color:var(--accent);width:20px;height:20px}
+.header-right{display:flex;align-items:center;gap:1rem}
+.header-right a,.header-right button.linkish{font-size:.8rem;color:var(--text-secondary);display:flex;align-items:center;gap:.35rem;transition:color .15s;background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
+.header-right a:hover,.header-right button.linkish:hover{color:var(--text-primary)}
+.header-right button.linkish.active{color:var(--accent)}
+.header-right a svg.icon,.header-right button.linkish svg.icon{width:14px;height:14px}
+.user-chip{font-size:.78rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem}
+.user-chip svg.icon{width:14px;height:14px}
+.admin-badge{background:var(--accent-bg);color:var(--accent);font-size:.7rem;font-weight:600;padding:.2rem .5rem;border-radius:4px;text-transform:uppercase;letter-spacing:.03em}
+
+.layout{display:flex;flex:1;overflow:hidden}
+
+.sidebar{width:var(--sidebar-width);background:var(--bg-secondary);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.sidebar-head{padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+.sidebar-title{font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
+.sidebar-actions{display:flex;gap:.25rem}
+.sidebar-actions button{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:.25rem;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.sidebar-actions button:hover{color:var(--text-primary);background:var(--bg-hover)}
+.sidebar-actions button svg.icon{width:14px;height:14px}
+.sidebar-content{flex:1;overflow-x:auto;overflow-y:auto;padding:.375rem 0}
+.sidebar-content::-webkit-scrollbar{width:5px}
+.sidebar-content::-webkit-scrollbar-track{background:transparent}
+.sidebar-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.sidebar-content::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+
+.stree{list-style:none;user-select:none}
+.stree li{position:relative}
+.stree .srow{display:flex;align-items:center;padding:.32rem .75rem .32rem .4rem;gap:.4rem;cursor:pointer;font-size:.82rem;color:var(--text-secondary);transition:background .1s,color .1s;border-radius:0 6px 6px 0;margin-right:.5rem;position:relative;min-width:0}
+.stree .srow:hover{background:var(--bg-hover);color:var(--text-primary)}
+.stree .srow.active{background:var(--accent-bg);color:var(--accent);font-weight:500}
+.stree .srow.active::before{content:'';position:absolute;left:0;top:3px;bottom:3px;width:2px;background:var(--accent);border-radius:1px}
+.stree .chevron{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--text-muted);transition:transform .15s;border-radius:3px}
+.stree .chevron:hover{color:var(--text-primary);background:var(--bg-tertiary)}
+.stree .chevron.open{transform:rotate(90deg)}
+.stree .chevron.empty{visibility:hidden;pointer-events:none}
+.stree .node-icon{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--accent)}
+.stree .node-icon.file{color:var(--text-muted)}
+.stree .nodename{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.stree .node-count{font-size:.7rem;color:var(--text-muted);margin-left:auto;padding-left:.5rem;flex-shrink:0}
+/* Nesting guide: one quiet rail; indent is set per-row in JS and capped so deep trees don't crush names */
+.stree .children{list-style:none;margin:0;padding:0}
+.stree .children.hidden{display:none}
+.stree .srow.nested::after{content:'';position:absolute;left:calc(var(--indent, 20px) - 8px);top:0;bottom:0;width:1px;background:var(--border);pointer-events:none}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.main-toolbar{padding:.75rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.75rem;flex-shrink:0;background:var(--bg-secondary);flex-wrap:wrap}
+.search-wrap{display:flex;align-items:center;gap:.4rem;flex:1;min-width:160px;max-width:360px;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:.35rem .65rem}
+.search-wrap:focus-within{border-color:var(--accent)}
+.search-wrap svg.icon{width:14px;height:14px;color:var(--text-muted);flex-shrink:0}
+.search-wrap input{flex:1;min-width:0;border:none;background:transparent;color:var(--text-primary);font-size:.82rem;font-family:inherit;outline:none}
+.search-wrap button.clear-search{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;display:none;align-items:center}
+.search-wrap button.clear-search.visible{display:flex}
+.search-wrap button.clear-search svg.icon{width:14px;height:14px}
+.search-global{margin-bottom:1rem}
+.search-global h4{font-size:.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding:.25rem .75rem .5rem;display:flex;align-items:center;gap:.4rem}
+.search-global h4 svg.icon{width:12px;height:12px}
+.search-global.hidden{display:none}
+.breadcrumb{display:flex;align-items:center;gap:.15rem;font-size:.82rem;flex:1;min-width:0;overflow:hidden}
+.breadcrumb a{color:var(--text-secondary);display:flex;align-items:center;gap:.15rem;transition:color .15s;white-space:nowrap;padding:.2rem .35rem;border-radius:4px}
+.breadcrumb a:hover{color:var(--text-primary);background:var(--bg-hover)}
+.breadcrumb .sep{color:var(--text-muted);font-size:.7rem;display:flex;align-items:center}
+.breadcrumb .sep svg.icon{width:12px;height:12px}
+.toolbar-btns{display:flex;gap:.4rem;flex-shrink:0}
+.toolbar-btns button{padding:.4rem .75rem;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);border-radius:6px;cursor:pointer;font-size:.78rem;display:flex;align-items:center;gap:.35rem;transition:all .15s;font-family:inherit}
+.toolbar-btns button svg.icon{width:13px;height:13px}
+.toolbar-btns button:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-light)}
+.toolbar-btns button.danger{background:var(--danger-bg);color:var(--danger);border-color:var(--danger)}
+.toolbar-btns button.danger:hover{background:var(--danger);color:#fff}
+.toolbar-btns button.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
+body.trash-view .upload-zone,body.trash-view #uploadQueue{display:none !important}
+body.trash-view .bulk-bar{display:none !important}
+body.trash-view #toolbarZip{display:none !important}
+.stree .srow.root-row .node-icon svg.icon{color:var(--text-muted)}
+.header-right button.linkish.active{color:var(--accent);background:var(--accent-bg)}
+.trash-meta{font-size:.72rem;color:var(--text-muted);display:block;margin-top:.15rem}
+
+
+.content-scroll{flex:1;overflow-y:auto;padding:1rem 1.5rem 2rem}
+.content-scroll::-webkit-scrollbar{width:6px}
+.content-scroll::-webkit-scrollbar-track{background:transparent}
+.content-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.upload-zone{border:2px dashed var(--border);border-radius:10px;padding:2rem;text-align:center;color:var(--text-muted);margin-bottom:1rem;transition:all .2s;cursor:pointer;position:relative}
+.upload-zone svg.icon{width:32px;height:32px;margin-bottom:.5rem;opacity:.5}
+.upload-zone p{font-size:.85rem;margin-top:.25rem}
+.upload-zone .hint{font-size:.75rem;color:var(--text-muted);margin-top:.35rem;opacity:.85}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.upload-zone:hover svg.icon,.upload-zone.dragover svg.icon{opacity:1}
+.upload-zone.dragover{border-style:solid;transform:scale(1.01)}
+.upload-zone input{display:none}
+.upload-queue{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.25rem}
+.upload-item{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:.75rem .9rem}
+.upload-item-top{display:flex;align-items:center;gap:.6rem;margin-bottom:.45rem}
+.upload-item-name{flex:1;min-width:0;font-size:.82rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-item-meta{font-size:.72rem;color:var(--text-muted);flex-shrink:0}
+.upload-item-bar{height:6px;background:var(--bg-primary);border-radius:99px;overflow:hidden}
+.upload-item-bar > span{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .15s ease}
+.upload-item.done .upload-item-bar > span{background:var(--success)}
+.upload-item.err .upload-item-bar > span{background:var(--danger)}
+.upload-item.err .upload-item-meta{color:var(--danger)}
+.upload-item.done .upload-item-meta{color:var(--success)}
+
+.filelist{list-style:none}
+.filelist .section-label{font-size:.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding:.5rem .75rem .35rem;display:flex;align-items:center;gap:.4rem}
+.filelist .section-label svg.icon{width:12px;height:12px}
+.filelist li{border-bottom:1px solid var(--border)}
+.filelist li:last-child{border-bottom:none}
+.filelist .row{display:flex;align-items:center;padding:.5rem .75rem;gap:.75rem;transition:background .1s;border-radius:6px;margin:0 .25rem}
+.filelist .row:hover{background:var(--bg-hover)}
+.filelist .row-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.filelist .row-icon svg.icon{width:18px;height:18px}
+.filelist .row-icon.dir svg.icon{color:var(--accent)}
+.filelist .row-icon.file svg.icon{color:var(--text-muted)}
+.filelist .row-name{flex:1;min-width:0;font-size:.85rem}
+.filelist .row-name.dir{color:var(--text-primary);font-weight:500;cursor:pointer}
+.filelist .row-name.dir:hover{color:var(--accent)}
+.filelist .row-name.file{color:var(--text-secondary);cursor:pointer}
+.filelist .row-name.file:hover{color:var(--accent)}
+.filelist .row-size{color:var(--text-muted);font-size:.75rem;min-width:65px;text-align:right;flex-shrink:0}
+.filelist .row-actions{display:flex;gap:.25rem;flex-shrink:0;opacity:0;transition:opacity .15s}
+.filelist .row:hover .row-actions{opacity:1}
+.filelist .row-actions button,.filelist .row-actions a.action-btn{padding:.25rem .45rem;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-muted);border-radius:4px;cursor:pointer;font-size:.7rem;display:flex;align-items:center;gap:.2rem;transition:all .15s;text-decoration:none;font-family:inherit}
+.filelist .row-actions button svg.icon,.filelist .row-actions a.action-btn svg.icon{width:12px;height:12px}
+.filelist .row-actions button:hover,.filelist .row-actions a.action-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-light)}
+.filelist .row-actions button.del:hover{background:var(--danger-bg);color:var(--danger);border-color:var(--danger)}
+.filelist .row-actions a.action-btn.dl{color:var(--text-secondary);padding:.3rem .6rem;font-size:.75rem}
+.filelist .row-actions a.action-btn.dl:hover{color:var(--accent)}
+.empty-state{text-align:center;padding:4rem 2rem;color:var(--text-muted)}
+.empty-state svg.icon{width:48px;height:48px;margin-bottom:1rem;opacity:.3}
+.empty-state p{font-size:.9rem}
+
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:420px;max-width:90vw;box-shadow:0 16px 48px rgba(0,0,0,.4)}
+.modal h3{font-size:.95rem;margin-bottom:1rem;color:var(--text-primary);font-weight:600}
+.modal p.hint{font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem;line-height:1.4}
+.modal input[type=text]{width:100%;padding:.6rem .75rem;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);border-radius:6px;font-size:.85rem;font-family:inherit;transition:border-color .15s}
+.modal input[type=text]:focus{outline:none;border-color:var(--accent)}
+.modal .btns{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.25rem}
+.modal .btns button{padding:.5rem 1rem;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);border-radius:6px;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
+.modal .btns button:hover{background:var(--bg-hover);color:var(--text-primary)}
+.modal .btns button.ok{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500}
+.modal .btns button.ok:hover{background:var(--accent-hover)}
+.modal .btns button.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+
+/* Preview modal */
+.preview-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(6px);z-index:120;align-items:center;justify-content:center;padding:1.25rem}
+.preview-overlay.active{display:flex}
+.preview-modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;width:min(960px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden}
+.preview-header{display:flex;align-items:center;gap:.75rem;padding:.85rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.preview-header h3{font-size:.9rem;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.preview-header .preview-actions{display:flex;gap:.4rem;flex-shrink:0}
+.preview-header a,.preview-header button{padding:.4rem .7rem;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);border-radius:6px;cursor:pointer;font-size:.78rem;display:flex;align-items:center;gap:.3rem;text-decoration:none;font-family:inherit;transition:all .15s}
+.preview-header a:hover,.preview-header button:hover{color:var(--text-primary);border-color:var(--border-light);background:var(--bg-hover)}
+.preview-header a svg.icon,.preview-header button svg.icon{width:14px;height:14px}
+.preview-body{flex:1;min-height:0;overflow:auto;padding:1rem;display:flex;align-items:center;justify-content:center;background:var(--bg-primary)}
+.preview-body img{max-width:100%;max-height:calc(92vh - 90px);object-fit:contain;border-radius:4px}
+.preview-body video{max-width:100%;max-height:calc(92vh - 90px);border-radius:4px;background:#000}
+.preview-body iframe{width:100%;height:calc(92vh - 90px);border:none;border-radius:4px;background:#fff}
+.preview-body pre{margin:0;width:100%;max-height:calc(92vh - 90px);overflow:auto;padding:1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;font-size:.82rem;line-height:1.45;white-space:pre-wrap;word-break:break-word;color:var(--text-primary);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.preview-empty{text-align:center;color:var(--text-muted);padding:2.5rem 1.5rem}
+.preview-empty svg.icon{width:40px;height:40px;opacity:.35;margin-bottom:.75rem}
+.preview-empty p{font-size:.9rem;margin-bottom:1rem}
+.preview-empty a{display:inline-flex;align-items:center;gap:.35rem;padding:.5rem 1rem;background:var(--accent);color:#fff;border-radius:6px;font-size:.82rem;font-weight:500;text-decoration:none}
+.preview-empty a:hover{background:var(--accent-hover);color:#fff}
+.preview-empty a svg.icon{width:14px;height:14px}
+
+
+.filelist .row-check{flex-shrink:0;display:flex;align-items:center}
+.filelist .row-check input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+.filelist .row.selected{background:var(--accent-bg)}
+.bulk-bar{display:none;align-items:center;gap:.6rem;padding:.55rem .75rem;margin:0 .75rem .75rem;background:var(--accent-bg);border:1px solid var(--accent);border-radius:8px;flex-wrap:wrap}
+.bulk-bar.active{display:flex}
+.bulk-bar .count{font-size:.82rem;color:var(--accent);font-weight:600;margin-right:.25rem}
+.bulk-bar button{padding:.35rem .7rem;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);border-radius:6px;cursor:pointer;font-size:.78rem;font-family:inherit;display:inline-flex;align-items:center;gap:.3rem}
+.bulk-bar button:hover{background:var(--bg-hover);color:var(--text-primary)}
+.bulk-bar button.danger{color:var(--danger);border-color:var(--danger)}
+.bulk-bar button svg.icon{width:13px;height:13px}
+.modal.wide{width:560px}
+.modal input[type=password],.modal select{width:100%;padding:.6rem .75rem;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);border-radius:6px;font-size:.85rem;font-family:inherit;margin-bottom:.65rem}
+.modal input[type=password]:focus,.modal select:focus{outline:none;border-color:var(--accent)}
+.users-list,.shares-list{max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:.85rem}
+.users-list .u-row,.shares-list .s-row{display:flex;align-items:center;gap:.5rem;padding:.55rem .7rem;border-bottom:1px solid var(--border);font-size:.82rem}
+.users-list .u-row:last-child,.shares-list .s-row:last-child{border-bottom:none}
+.users-list .u-name,.shares-list .s-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.users-list .u-role{color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
+.users-list .u-actions,.shares-list .s-actions{display:flex;gap:.25rem;flex-shrink:0}
+.users-list button,.shares-list button{padding:.25rem .45rem;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-muted);border-radius:4px;cursor:pointer;font-size:.7rem;font-family:inherit}
+.users-list button:hover,.shares-list button:hover{color:var(--text-primary);background:var(--bg-hover)}
+.users-list button.danger:hover{color:var(--danger);background:var(--danger-bg)}
+.share-pass{margin:.15rem 0 .85rem}
+.share-pass label{display:block;font-size:.75rem;color:var(--text-muted);margin-bottom:.35rem}
+.form-grid label{display:block;font-size:.75rem;color:var(--text-muted);margin-bottom:.3rem}
+.form-grid .field{margin-bottom:.65rem}
+
+.share-options{display:flex;flex-direction:column;gap:.5rem;margin:.25rem 0 1rem}
+.share-options label{display:flex;align-items:center;gap:.55rem;padding:.55rem .7rem;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:.82rem;color:var(--text-secondary);transition:all .15s}
+.share-options label:hover{background:var(--bg-hover);color:var(--text-primary)}
+.share-options label:has(input:checked){border-color:var(--accent);background:var(--accent-bg);color:var(--accent)}
+.share-options input{accent-color:var(--accent)}
+.share-result{display:none;margin-top:.5rem}
+.share-result.active{display:block}
+.share-result label{font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.35rem}
+.share-result .row{display:flex;gap:.4rem}
+.share-result input[type=text]{flex:1;padding:.55rem .65rem;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);border-radius:6px;font-size:.78rem;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.share-result button{padding:.55rem .75rem;border:1px solid var(--border);background:var(--accent);color:#fff;border-radius:6px;cursor:pointer;font-size:.78rem;font-family:inherit;white-space:nowrap}
+.share-result button:hover{background:var(--accent-hover)}
+
+.dirpick{max-height:200px;overflow-y:auto;margin-bottom:.5rem;border:1px solid var(--border);border-radius:6px}
+.dirpick-item{padding:.45rem .75rem;font-size:.82rem;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:.4rem;transition:background .1s}
+.dirpick-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.dirpick-item svg.icon{width:14px;height:14px;color:var(--accent)}
+
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;padding:.65rem 1rem;border-radius:8px;font-size:.82rem;z-index:200;display:flex;align-items:center;gap:.5rem;animation:slideUp .3s;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.toast.ok{background:var(--bg-secondary);border:1px solid var(--success);color:var(--success)}
+.toast.err{background:var(--bg-secondary);border:1px solid var(--danger);color:var(--danger)}
+.toast svg.icon{width:14px;height:14px}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+<symbol id="i-hard-drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-log-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></symbol>
+<symbol id="i-log-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></symbol>
+<symbol id="i-folder-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
+<symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+<symbol id="i-cloud-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></symbol>
+<symbol id="i-alert-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-folder-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+<symbol id="i-arrow-right-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></symbol>
+<symbol id="i-undo-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+<symbol id="i-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+<symbol id="i-film" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></symbol>
+<symbol id="i-file-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></symbol>
+</svg>
+<div class="header">
+  <div class="header-left">
+    <h1><svg class="icon" aria-hidden="true"><use href="#i-hard-drive"></use></svg> dingbap</h1>
+    {{if .Admin}}<span class="admin-badge">Admin</span>{{end}}
+  </div>
+  <div class="header-right">
+    {{if .Username}}
+    <span class="user-chip"><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg> {{.Username}}</span>
+    {{end}}
+    {{if .Username}}
+    <button type="button" class="linkish" id="btnChangePassword"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg> Password</button>
+    {{end}}
+    {{if .Admin}}
+    <button type="button" class="linkish" id="btnUsersNav"><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg> Users</button>
+    <button type="button" class="linkish" id="btnSharesNav"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg> Shares</button>
+    <button type="button" class="linkish" id="btnTrashNav"><svg class="icon" aria-hidden="true"><use href="#i-trash-2"></use></svg> Trash</button>
+    <a href="/"><svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg> View as public</a>
+    {{else if eq .Role "admin"}}
+    <a href="/admin"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg> Admin</a>
+    {{else if not .Username}}
+    <a href="/login"><svg class="icon" aria-hidden="true"><use href="#i-log-in"></use></svg> Log in</a>
+    {{end}}
+    {{if .Username}}
+    <button type="button" class="linkish" id="btnLogout"><svg class="icon" aria-hidden="true"><use href="#i-log-out"></use></svg> Log out</button>
+    {{end}}
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-head">
+      <span class="sidebar-title">Folders</span>
+      {{if .Admin}}<div class="sidebar-actions">
+        <button type="button" id="btnSidebarMkdir" title="New folder"><svg class="icon" aria-hidden="true"><use href="#i-folder-plus"></use></svg></button>
+        <button type="button" id="btnSidebarRefresh" title="Refresh"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"></use></svg></button>
+      </div>{{end}}
+    </div>
+    <div class="sidebar-content" id="sidebarTree"></div>
+  </div>
+
+  <div class="main">
+    <div class="main-toolbar">
+      <div class="search-wrap" id="searchWrap">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <input type="search" id="searchInput" placeholder="Search files and folders…" autocomplete="off" spellcheck="false">
+        <button type="button" class="clear-search" id="searchClear" title="Clear"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg></button>
+      </div>
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="toolbar-btns" id="toolbarZip">
+        <button type="button" id="btnSelectAll" title="Select all in this folder"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg> Select</button>
+        <button type="button" id="btnZipSelection" disabled><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg> ZIP</button>
+      </div>
+      {{if .Admin}}<div class="toolbar-btns" id="toolbarBrowse">
+        <button type="button" id="btnMkdir"><svg class="icon" aria-hidden="true"><use href="#i-folder-plus"></use></svg> New folder</button>
+        <button type="button" class="primary" id="btnUpload"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg> Upload</button>
+      </div>
+      <div class="toolbar-btns" id="toolbarTrash" style="display:none">
+        <button type="button" id="btnBackFromTrash"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg> Back to files</button>
+        <button type="button" class="danger" id="btnEmptyTrash"><svg class="icon" aria-hidden="true"><use href="#i-trash-2"></use></svg> Empty trash</button>
+      </div>{{end}}
+    </div>
+    <div class="content-scroll">
+      {{if .Admin}}
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" multiple>
+        <svg class="icon" aria-hidden="true"><use href="#i-cloud-upload"></use></svg>
+        <p>Drag files here or click to upload</p>
+        <p class="hint">Multiple files · if interrupted, pick the same file again to resume (skips finished chunks)</p>
+      </div>
+      <div class="upload-queue" id="uploadQueue"></div>
+      {{end}}
+      <div class="search-global hidden" id="searchGlobal">
+        <h4><svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg> Global search results <span id="searchGlobalCount"></span></h4>
+        <ul class="filelist" id="searchGlobalList"></ul>
+      </div>
+      <div class="bulk-bar" id="bulkBar">
+        <span class="count" id="bulkCount">0 selected</span>
+        <button type="button" id="btnBulkZip"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg> Download ZIP</button>
+        {{if .Admin}}
+        <button type="button" id="btnBulkMove"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right-left"></use></svg> Move</button>
+        <button type="button" class="danger" id="btnBulkDelete"><svg class="icon" aria-hidden="true"><use href="#i-trash-2"></use></svg> Trash</button>
+        {{end}}
+        <button type="button" id="btnBulkClear">Clear</button>
+      </div>
+      <ul class="filelist" id="fileList"></ul>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalBox">
+    <h3 id="modalTitle"></h3>
+    <p class="hint" id="modalHint" style="display:none"></p>
+    <div id="modalBody">
+      <input type="text" id="modalInput" autocomplete="off">
+    </div>
+    <div class="btns">
+      <button type="button" id="modalCancel">Cancel</button>
+      <button type="button" class="ok" id="modalOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="preview-overlay" id="previewOverlay" role="dialog" aria-modal="true">
+  <div class="preview-modal">
+    <div class="preview-header">
+      <h3 id="previewTitle">Preview</h3>
+      <div class="preview-actions">
+        <a id="previewDownload" href="#"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg> Download</a>
+        <button type="button" id="previewClose"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg> Close</button>
+      </div>
+    </div>
+    <div class="preview-body" id="previewBody"></div>
+  </div>
+</div>
+
+<script>
+
+const IS_ADMIN = {{if .Admin}}true{{else}}false{{end}};
+const LOGGED_IN = {{if .Username}}true{{else}}false{{end}};
+const TREE_URL = IS_ADMIN ? '/admin/api/tree' : '/api/tree';
+const SEARCH_URL = IS_ADMIN ? '/admin/api/search' : '/api/search';
+const ZIP_URL = IS_ADMIN ? '/admin/bulk/zip' : '/api/zip';
+const MAX_TEXT_PREVIEW = 2 * 1024 * 1024;
+let trashView = false;
+let searchTimer = null;
+let searchSeq = 0;
+/** @type {Set<string>} */
+const selectedPaths = new Set();
+
+let currentPath = '';
+/** @type {Map<string, Array>} path -> listing */
+const listingCache = new Map();
+/** @type {Set<string>} */
+const expandedPaths = new Set(['']);
+/** @type {Set<string>} */
+const loadedPaths = new Set();
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function api(url, body) {
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(r => r.json());
+}
+
+function toast(msg, ok) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (ok ? 'ok' : 'err');
+  el.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-' + (ok ? 'check-circle' : 'alert-circle') + '"></use></svg><span></span>';
+  el.querySelector('span').textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+function formatSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  return (b / 1073741824).toFixed(1) + ' GB';
+}
+
+async function fetchListing(path) {
+  const q = path ? '?path=' + encodeURIComponent(path) : '';
+  const res = await fetch(TREE_URL + q);
+  if (res.status === 401) {
+    location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
+    throw new Error('auth');
+  }
+  if (!res.ok) throw new Error('Failed to load directory');
+  const items = await res.json();
+  listingCache.set(path || '', Array.isArray(items) ? items : []);
+  loadedPaths.add(path || '');
+  return listingCache.get(path || '');
+}
+
+async function ensureListing(path) {
+  const key = path || '';
+  if (listingCache.has(key)) return listingCache.get(key);
+  return fetchListing(key);
+}
+
+function invalidateCache() {
+  listingCache.clear();
+  loadedPaths.clear();
+}
+
+function dirsAt(path) {
+  const items = listingCache.get(path || '') || [];
+  return items.filter(i => i.isDir);
+}
+
+function renderSidebar() {
+  const el = document.getElementById('sidebarTree');
+  const rootActive = !trashView && currentPath === '';
+  let html = '<ul class="stree">';
+  html += '<li><div class="srow root-row' + (rootActive ? ' active' : '') + '" data-path="" data-root="1">';
+  html += '<span class="chevron empty"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg></span>';
+  html += '<span class="node-icon"><svg class="icon" aria-hidden="true"><use href="#i-home"></use></svg></span>';
+  html += '<span class="nodename">All files</span>';
+  html += '</div></li>';
+  html += buildSidebarLevel('');
+  html += '</ul>';
+  el.innerHTML = html;
+  el.querySelectorAll('.srow').forEach(row => {
+    row.addEventListener('click', onSidebarClick);
+  });
+}
+
+function buildSidebarLevel(parentPath, depth) {
+  depth = depth || 0;
+  const dirs = dirsAt(parentPath);
+  if (!dirs.length) return '';
+  // Cap visual indent so very deep trees still leave room for the name.
+  const INDENT_PX = 14;
+  const MAX_DEPTH = 8;
+  const padLeft = 6 + Math.min(depth, MAX_DEPTH) * INDENT_PX;
+  let html = '';
+  for (const d of dirs) {
+    const p = d.path;
+    const active = !trashView && currentPath === p;
+    const expanded = expandedPaths.has(p);
+    const hasKids = (d.childCount || 0) > 0 || (listingCache.has(p) && dirsAt(p).length > 0);
+    const chevronCls = !hasKids && loadedPaths.has(p) ? 'chevron empty' : (expanded ? 'chevron open' : 'chevron');
+    const kidsCls = expanded ? 'children' : 'children hidden';
+    const nestCls = depth > 0 ? ' nested' : '';
+    html += '<li>';
+    html += '<div class="srow' + nestCls + (active ? ' active' : '') + '" data-path="' + escapeHtml(p) + '" data-has-kids="' + (hasKids || !loadedPaths.has(p) ? '1' : '0') + '" style="padding-left:' + padLeft + 'px;--indent:' + padLeft + 'px" title="' + escapeHtml(p || '/') + '">';
+    html += '<span class="' + chevronCls + '"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg></span>';
+    html += '<span class="node-icon"><svg class="icon" aria-hidden="true"><use href="#i-' + (expanded ? 'folder-open' : 'folder') + '"></use></svg></span>';
+    html += '<span class="nodename">' + escapeHtml(d.name) + '</span>';
+    if (d.childCount) html += '<span class="node-count">' + d.childCount + '</span>';
+    html += '</div>';
+    html += '<ul class="' + kidsCls + '">' + (expanded ? buildSidebarLevel(p, depth + 1) : '') + '</ul>';
+    html += '</li>';
+  }
+  return html;
+}
+
+async function onSidebarClick(e) {
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const path = row.getAttribute('data-path') || '';
+  const isRoot = row.getAttribute('data-root') === '1';
+  const chevron = e.target.closest('.chevron');
+  const maybeKids = row.getAttribute('data-has-kids') === '1';
+
+  // Chevron only toggles expand/collapse — does not navigate.
+  if (chevron && !chevron.classList.contains('empty') && !isRoot) {
+    if (expandedPaths.has(path)) {
+      expandedPaths.delete(path);
+      for (const ep of [...expandedPaths]) {
+        if (ep.startsWith(path + '/')) expandedPaths.delete(ep);
+      }
+    } else {
+      expandedPaths.add(path);
+      try { await ensureListing(path); } catch (_) {}
+    }
+    renderSidebar();
+    return;
+  }
+
+  if (trashView) {
+    await leaveTrashView({ skipNavigate: true });
+  }
+  // Expand destination so its children can load, but don't force-toggle this node.
+  if (path && !expandedPaths.has(path) && maybeKids) {
+    expandedPaths.add(path);
+    try { await ensureListing(path); } catch (_) {}
+  }
+  await navigate(path);
+}
+
+function renderBreadcrumb() {
+  const el = document.getElementById('breadcrumb');
+  el.textContent = '';
+  const home = document.createElement('a');
+  home.href = '#';
+  home.innerHTML = '<svg class="icon" aria-hidden="true" style="width:14px;height:14px"><use href="#i-home"></use></svg>';
+  home.addEventListener('click', e => { e.preventDefault(); navigate(''); });
+  el.appendChild(home);
+
+  const parts = currentPath ? currentPath.split('/') : [];
+  let acc = '';
+  for (const p of parts) {
+    acc += (acc ? '/' : '') + p;
+    const sep = document.createElement('span');
+    sep.className = 'sep';
+    sep.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg>';
+    el.appendChild(sep);
+    const link = document.createElement('a');
+    link.href = '#';
+    link.textContent = p;
+    const target = acc;
+    link.addEventListener('click', e => { e.preventDefault(); navigate(target); });
+    el.appendChild(link);
+  }
+}
+
+function renderFileList() {
+  const el = document.getElementById('fileList');
+  el.textContent = '';
+  const items = listingCache.get(currentPath || '') || [];
+  if (!items.length) {
+    el.innerHTML = '<div class="empty-state"><svg class="icon" aria-hidden="true"><use href="#i-folder-open"></use></svg><p>This folder is empty</p></div>';
+    return;
+  }
+
+  const dirs = items.filter(i => i.isDir);
+  const files = items.filter(i => !i.isDir);
+
+  if (dirs.length) {
+    const label = document.createElement('li');
+    label.className = 'section-label';
+    label.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg> Folders (' + dirs.length + ')';
+    el.appendChild(label);
+    for (const d of dirs) el.appendChild(buildFileRow(d, true));
+  }
+  if (files.length) {
+    const label = document.createElement('li');
+    label.className = 'section-label';
+    label.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg> Files (' + files.length + ')';
+    el.appendChild(label);
+    for (const f of files) el.appendChild(buildFileRow(f, false));
+  }
+  applyLocalSearchFilter();
+}
+
+function clearSelection() {
+  selectedPaths.clear();
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  const count = document.getElementById('bulkCount');
+  const zipBtn = document.getElementById('btnZipSelection');
+  const n = selectedPaths.size;
+  if (count) count.textContent = n + ' selected';
+  if (bar) bar.classList.toggle('active', n > 0 && !trashView);
+  if (zipBtn) zipBtn.disabled = n === 0;
+  document.querySelectorAll('.filelist .row-check input').forEach(cb => {
+    const p = cb.getAttribute('data-path');
+    cb.checked = selectedPaths.has(p);
+    cb.closest('.row')?.classList.toggle('selected', selectedPaths.has(p));
+  });
+}
+
+function toggleSelect(path, on) {
+  if (on) selectedPaths.add(path);
+  else selectedPaths.delete(path);
+  updateBulkBar();
+}
+
+async function downloadZip(paths) {
+  if (!paths.length) return;
+  try {
+    const res = await fetch(ZIP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths })
+    });
+    if (!res.ok) {
+      let msg = 'ZIP failed';
+      try {
+        const j = await res.json();
+        if (j.error) msg = j.error;
+      } catch (_) {}
+      toast(msg, false);
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    a.href = url;
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = /filename\*=UTF-8''([^;]+)|filename="([^"]+)"/i.exec(cd);
+    a.download = decodeURIComponent((m && (m[1] || m[2])) || 'dingbap.zip');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('ZIP ready', true);
+  } catch (_) {
+    toast('ZIP failed', false);
+  }
+}
+
+function buildFileRow(item, isDir) {
+  const li = document.createElement('li');
+  const row = document.createElement('div');
+  row.className = 'row' + (selectedPaths.has(item.path) ? ' selected' : '');
+
+  const checkWrap = document.createElement('span');
+  checkWrap.className = 'row-check';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.setAttribute('data-path', item.path);
+  cb.checked = selectedPaths.has(item.path);
+  cb.addEventListener('click', e => e.stopPropagation());
+  cb.addEventListener('change', () => toggleSelect(item.path, cb.checked));
+  checkWrap.appendChild(cb);
+  row.appendChild(checkWrap);
+
+  const icon = document.createElement('span');
+  icon.className = 'row-icon ' + (isDir ? 'dir' : 'file');
+  icon.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-' + (isDir ? 'folder' : fileIcon(item.name)) + '"></use></svg>';
+  row.appendChild(icon);
+
+  const name = document.createElement('span');
+  name.className = 'row-name ' + (isDir ? 'dir' : 'file');
+  name.textContent = item.name;
+  if (isDir) {
+    name.addEventListener('click', () => navigate(item.path));
+  } else {
+    name.addEventListener('click', () => openPreview(item));
+    name.title = 'Preview';
+  }
+  row.appendChild(name);
+
+  const size = document.createElement('span');
+  size.className = 'row-size';
+  size.textContent = isDir
+    ? (item.childCount ? (item.childCount + ' items') : '')
+    : formatSize(item.size || 0);
+  row.appendChild(size);
+
+  const actions = document.createElement('span');
+  actions.className = 'row-actions';
+
+  if (IS_ADMIN) {
+    const renameBtn = document.createElement('button');
+    renameBtn.type = 'button';
+    renameBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg>' + (isDir ? ' Rename' : '');
+    renameBtn.addEventListener('click', () => showRenameModal(item.path, item.name));
+    actions.appendChild(renameBtn);
+
+    const shareBtn = document.createElement('button');
+    shareBtn.type = 'button';
+    shareBtn.title = 'Share';
+    shareBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg>';
+    shareBtn.addEventListener('click', () => showShareModal(item.path, item.name, isDir));
+    actions.appendChild(shareBtn);
+
+    const moveBtn = document.createElement('button');
+    moveBtn.type = 'button';
+    moveBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-arrow-right-left"></use></svg>';
+    moveBtn.addEventListener('click', () => showMoveModal(item.path));
+    actions.appendChild(moveBtn);
+
+    if (!isDir) {
+      const dl = document.createElement('a');
+      dl.className = 'action-btn';
+      dl.href = fileURL('download', item.path);
+      dl.title = 'Download';
+      dl.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>';
+      dl.addEventListener('click', e => e.stopPropagation());
+      actions.appendChild(dl);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'del';
+    delBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-trash-2"></use></svg>' + (isDir ? ' Move to trash' : '');
+    delBtn.title = 'Move to trash';
+    delBtn.addEventListener('click', () => confirmDelete(item.path, item.name, isDir));
+    actions.appendChild(delBtn);
+  } else if (!isDir) {
+    const dl = document.createElement('a');
+    dl.className = 'action-btn dl';
+    dl.href = fileURL('download', item.path);
+    dl.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg> Download';
+    dl.addEventListener('click', e => e.stopPropagation());
+    actions.appendChild(dl);
+  }
+
+  row.appendChild(actions);
+  li.appendChild(row);
+  return li;
+}
+
+function fileURL(kind, path) {
+  return '/' + kind + '/' + path.split('/').map(encodeURIComponent).join('/');
+}
+
+function fileExt(name) {
+  const i = name.lastIndexOf('.');
+  return i >= 0 ? name.slice(i).toLowerCase() : '';
+}
+
+function previewKind(name) {
+  switch (fileExt(name)) {
+    case '.png': case '.jpg': case '.jpeg': case '.webp': case '.gif':
+      return 'image';
+    case '.pdf':
+      return 'pdf';
+    case '.mp4': case '.webm':
+      return 'video';
+    case '.txt': case '.json': case '.md': case '.go':
+      return 'text';
+    default:
+      return '';
+  }
+}
+
+function fileIcon(name) {
+  switch (previewKind(name)) {
+    case 'image': return 'image';
+    case 'pdf': return 'file-text';
+    case 'video': return 'film';
+    case 'text': return 'file-code';
+    default: return 'file';
+  }
+}
+
+async function openPreview(item) {
+  const overlay = document.getElementById('previewOverlay');
+  const body = document.getElementById('previewBody');
+  const title = document.getElementById('previewTitle');
+  const dl = document.getElementById('previewDownload');
+  const kind = previewKind(item.name);
+  const downloadHref = fileURL('download', item.path);
+  const previewHref = fileURL('preview', item.path);
+
+  title.textContent = item.name;
+  dl.href = downloadHref;
+  body.textContent = '';
+
+  if (!kind) {
+    body.appendChild(previewEmptyState(downloadHref));
+  } else if (kind === 'image') {
+    const img = document.createElement('img');
+    img.src = previewHref;
+    img.alt = item.name;
+    body.appendChild(img);
+  } else if (kind === 'video') {
+    const video = document.createElement('video');
+    video.src = previewHref;
+    video.controls = true;
+    video.playsInline = true;
+    body.appendChild(video);
+  } else if (kind === 'pdf') {
+    const frame = document.createElement('iframe');
+    frame.src = previewHref;
+    frame.title = item.name;
+    body.appendChild(frame);
+  } else if (kind === 'text') {
+    if ((item.size || 0) > MAX_TEXT_PREVIEW) {
+      body.appendChild(previewEmptyState(downloadHref, 'File is too large to preview (max 2 MB).'));
+    } else {
+      const pre = document.createElement('pre');
+      pre.textContent = 'Loading…';
+      body.appendChild(pre);
+      try {
+        const res = await fetch(previewHref);
+        if (!res.ok) throw new Error('preview failed');
+        const text = await res.text();
+        pre.textContent = text;
+      } catch (_) {
+        body.textContent = '';
+        body.appendChild(previewEmptyState(downloadHref, 'Could not read the file.'));
+      }
+    }
+  }
+
+  overlay.classList.add('active');
+}
+
+function previewEmptyState(downloadHref, message) {
+  const wrap = document.createElement('div');
+  wrap.className = 'preview-empty';
+  wrap.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-eye-off"></use></svg>';
+  const p = document.createElement('p');
+  p.textContent = message || 'No preview available';
+  wrap.appendChild(p);
+  const a = document.createElement('a');
+  a.href = downloadHref;
+  a.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg> ' + 'Download file';
+  wrap.appendChild(a);
+  return wrap;
+}
+
+function closePreview() {
+  const overlay = document.getElementById('previewOverlay');
+  overlay.classList.remove('active');
+  const body = document.getElementById('previewBody');
+  // Stop media playback
+  body.querySelectorAll('video').forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); });
+  body.textContent = '';
+}
+
+document.getElementById('previewClose').addEventListener('click', closePreview);
+document.getElementById('previewOverlay').addEventListener('click', e => {
+  if (e.target.id === 'previewOverlay') closePreview();
+});
+
+
+async function navigate(path) {
+  currentPath = path || '';
+  clearSelection();
+  const parts = currentPath ? currentPath.split('/') : [];
+
+  try {
+    await ensureListing('');
+    let acc = '';
+    for (let i = 0; i < parts.length; i++) {
+      const parent = acc;
+      acc += (acc ? '/' : '') + parts[i];
+      expandedPaths.add(acc);
+      await ensureListing(parent);
+    }
+    await ensureListing(currentPath);
+  } catch (e) {
+    toast('Could not read folder', false);
+  }
+  renderBreadcrumb();
+  renderSidebar();
+  renderFileList();
+}
+
+async function refreshTree() {
+  invalidateCache();
+  await navigate(currentPath);
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('active');
+  document.getElementById('modalHint').style.display = 'none';
+  document.getElementById('modalHint').textContent = '';
+  document.getElementById('modalBox')?.classList.remove('wide');
+  const body = document.getElementById('modalBody');
+  body.querySelector('.dirpick')?.remove();
+  body.querySelector('.share-options')?.remove();
+  body.querySelector('.share-result')?.remove();
+  body.querySelector('.share-pass')?.remove();
+  body.querySelector('.users-panel')?.remove();
+  body.querySelector('.shares-panel')?.remove();
+  body.querySelector('.password-panel')?.remove();
+  const input = document.getElementById('modalInput');
+  input.style.display = '';
+  input.type = 'text';
+  input.value = '';
+  const ok = document.getElementById('modalOk');
+  ok.style.display = '';
+  ok.className = 'ok';
+  ok.textContent = 'OK';
+  ok.onclick = null;
+}
+
+document.getElementById('modalCancel').addEventListener('click', closeModal);
+
+if (IS_ADMIN) {
+  document.getElementById('btnSidebarMkdir')?.addEventListener('click', showMkdirModal);
+  document.getElementById('btnSidebarRefresh')?.addEventListener('click', refreshTree);
+  document.getElementById('btnMkdir')?.addEventListener('click', showMkdirModal);
+  document.getElementById('btnUpload')?.addEventListener('click', () => document.getElementById('fileInput').click());
+
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+  const uploadQueue = document.getElementById('uploadQueue');
+  const CHUNK_SIZE = 2 * 1024 * 1024;
+  const CHUNK_RETRIES = 3;
+
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadZone.classList.add('dragover');
+  });
+  uploadZone.addEventListener('dragenter', e => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+  });
+  uploadZone.addEventListener('dragleave', e => {
+    if (!uploadZone.contains(e.relatedTarget)) uploadZone.classList.remove('dragover');
+  });
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files);
+  });
+  document.querySelector('.content-scroll')?.addEventListener('dragover', e => {
+    if (e.dataTransfer?.types?.includes('Files')) {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    }
+  });
+  document.querySelector('.content-scroll')?.addEventListener('drop', e => {
+    if (!e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    uploadFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', () => uploadFiles(fileInput.files));
+
+  function resumeKey(file) {
+    return 'dingbap_upload:' + currentPath + ':' + file.name + ':' + file.size + ':' + file.lastModified;
+  }
+
+  function createUploadItem(file) {
+    const el = document.createElement('div');
+    el.className = 'upload-item';
+    el.innerHTML =
+      '<div class="upload-item-top">' +
+      '<span class="upload-item-name"></span>' +
+      '<span class="upload-item-meta">0%</span>' +
+      '</div><div class="upload-item-bar"><span></span></div>';
+    el.querySelector('.upload-item-name').textContent = file.name;
+    uploadQueue.appendChild(el);
+    return el;
+  }
+
+  function setUploadProgress(el, ratio, meta) {
+    const pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+    el.querySelector('.upload-item-bar > span').style.width = pct + '%';
+    el.querySelector('.upload-item-meta').textContent = meta || (pct + '%');
+  }
+
+  function formatEta(seconds) {
+    if (!isFinite(seconds) || seconds < 0) return '';
+    if (seconds < 5) return 'a few seconds left';
+    if (seconds < 60) return ((Math.ceil(seconds)) + 's left');
+    const m = Math.floor(seconds / 60);
+    const s = Math.ceil(seconds % 60);
+    return ((m) + 'm ' + (s) + 's left');
+  }
+
+  function progressLabel(done, total, started) {
+    const pct = total ? Math.round((done / total) * 100) : 100;
+    const elapsed = (performance.now() - started) / 1000;
+    if (!done || elapsed < 0.4) return pct + '%';
+    const rate = done / elapsed;
+    const remain = (total - done) / rate;
+    const eta = formatEta(remain);
+    return eta ? pct + '% · ' + eta : pct + '%';
+  }
+
+  async function uploadFiles(files) {
+    const list = [...files];
+    fileInput.value = '';
+    for (const file of list) {
+      await uploadOneFile(file);
+    }
+    await refreshTree();
+  }
+
+  async function uploadOneFile(file) {
+    const item = createUploadItem(file);
+    const started = performance.now();
+    let uploadedBytes = 0;
+
+    try {
+      let uploadId = localStorage.getItem(resumeKey(file)) || '';
+      let chunkSize = CHUNK_SIZE;
+      let totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE) || 1);
+      let received = new Set();
+
+      if (uploadId) {
+        const st = await fetch('/admin/upload/status?id=' + encodeURIComponent(uploadId));
+        if (st.ok) {
+          const data = await st.json();
+          if (data.ok && data.name === file.name && data.size === file.size) {
+            chunkSize = data.chunkSize;
+            totalChunks = data.totalChunks;
+            (data.received || []).forEach(i => received.add(i));
+          } else {
+            uploadId = '';
+            localStorage.removeItem(resumeKey(file));
+          }
+        } else {
+          uploadId = '';
+          localStorage.removeItem(resumeKey(file));
+        }
+      }
+
+      if (!uploadId) {
+        const initRes = await fetch('/admin/upload/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            path: currentPath,
+            name: file.name,
+            size: file.size,
+            chunkSize: CHUNK_SIZE
+          })
+        });
+        const initData = await initRes.json();
+        if (!initData.ok) throw new Error(initData.error || 'Init failed');
+        uploadId = initData.uploadId;
+        chunkSize = initData.chunkSize;
+        totalChunks = initData.totalChunks;
+        localStorage.setItem(resumeKey(file), uploadId);
+      }
+
+      for (let index = 0; index < totalChunks; index++) {
+        if (received.has(index)) {
+          let bytes = 0;
+          for (const i of received) {
+            bytes += (i === totalChunks - 1) ? (file.size - i * chunkSize) : chunkSize;
+          }
+          uploadedBytes = Math.min(file.size, bytes);
+          setUploadProgress(item, file.size ? uploadedBytes / file.size : 1, progressLabel(uploadedBytes, file.size, started));
+          continue;
+        }
+        const start = index * chunkSize;
+        const end = Math.min(file.size, start + chunkSize);
+        const blob = file.slice(start, end);
+
+        let lastErr = null;
+        for (let attempt = 0; attempt < CHUNK_RETRIES; attempt++) {
+          try {
+            const res = await fetch(
+              '/admin/upload/chunk?uploadId=' + encodeURIComponent(uploadId) + '&index=' + index,
+              {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: blob
+              }
+            );
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Chunk failed');
+            lastErr = null;
+            break;
+          } catch (err) {
+            lastErr = err;
+            await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+          }
+        }
+        if (lastErr) throw lastErr;
+
+        received.add(index);
+        let bytes = 0;
+        for (const i of received) {
+          bytes += (i === totalChunks - 1) ? (file.size - i * chunkSize) : chunkSize;
+        }
+        uploadedBytes = Math.min(file.size, Math.max(0, bytes));
+        setUploadProgress(item, file.size ? uploadedBytes / file.size : 1, progressLabel(uploadedBytes, file.size, started));
+      }
+
+      const doneRes = await fetch('/admin/upload/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadId })
+      });
+      const doneData = await doneRes.json();
+      if (!doneData.ok) throw new Error(doneData.error || 'Could not finish upload');
+
+      localStorage.removeItem(resumeKey(file));
+      item.classList.add('done');
+      setUploadProgress(item, 1, 'Done');
+      toast(doneData.message || 'Uploaded', true);
+      setTimeout(() => item.remove(), 2500);
+    } catch (err) {
+      item.classList.add('err');
+      setUploadProgress(item, uploadedBytes / Math.max(file.size, 1), err.message || 'Failed');
+      toast(err.message || 'Upload failed', false);
+    }
+  }
+
+  function showMkdirModal() {
+    document.getElementById('modalTitle').textContent = 'New folder';
+    document.getElementById('modalHint').style.display = 'none';
+    const input = document.getElementById('modalInput');
+    input.value = '';
+    input.placeholder = 'Folder name';
+    input.style.display = '';
+    document.getElementById('modalOk').style.display = '';
+    document.getElementById('modalOk').className = 'ok';
+    document.getElementById('modalBody').querySelector('.dirpick')?.remove();
+    document.getElementById('modalOk').onclick = doMkdir;
+    document.getElementById('modalOverlay').classList.add('active');
+    input.focus();
+  }
+
+  async function doMkdir() {
+    const name = document.getElementById('modalInput').value.trim();
+    if (!name) return;
+    const data = await api('/admin/mkdir', { path: currentPath, name });
+    toast(data.message || data.error, data.ok);
+    closeModal();
+    await refreshTree();
+  }
+
+  function showRenameModal(path, name) {
+    document.getElementById('modalTitle').textContent = ('Rename: ' + name);
+    document.getElementById('modalHint').style.display = 'none';
+    const input = document.getElementById('modalInput');
+    input.value = name;
+    input.style.display = '';
+    document.getElementById('modalOk').style.display = '';
+    document.getElementById('modalOk').className = 'ok';
+    document.getElementById('modalBody').querySelector('.dirpick')?.remove();
+    document.getElementById('modalOk').onclick = () => doRename(path);
+    document.getElementById('modalOverlay').classList.add('active');
+    input.focus();
+    input.select();
+  }
+
+  async function doRename(oldPath) {
+    const newName = document.getElementById('modalInput').value.trim();
+    if (!newName) return;
+    const data = await api('/admin/rename', { oldPath, newName });
+    toast(data.message || data.error, data.ok);
+    closeModal();
+    await refreshTree();
+  }
+
+  function confirmDelete(path, name, isDir) {
+      document.getElementById('modalTitle').textContent = isDir ? 'Move folder to trash' : 'Move to trash';
+      const hint = document.getElementById('modalHint');
+      hint.style.display = '';
+      if (isDir) {
+        hint.textContent = ('Type the folder name "' + name + '" to confirm. It can be restored from trash for 30 days.');
+      } else {
+        hint.textContent = 'The file will be moved to trash and can be restored for 30 days.';
+      }
+      const input = document.getElementById('modalInput');
+      if (isDir) {
+        input.value = '';
+        input.placeholder = name;
+        input.style.display = '';
+      } else {
+        input.style.display = 'none';
+        input.value = '';
+      }
+      document.getElementById('modalOk').style.display = '';
+      document.getElementById('modalOk').className = 'danger';
+      document.getElementById('modalOk').textContent = 'Move to trash';
+      document.getElementById('modalBody').querySelector('.dirpick')?.remove();
+      document.getElementById('modalOk').onclick = async () => {
+        const payload = { path, confirm: true };
+        if (isDir) {
+          const typed = input.value.trim();
+          if (typed !== name) {
+            toast('Folder name does not match', false);
+            return;
+          }
+          payload.confirmName = typed;
+        }
+        const data = await api('/admin/delete', payload);
+        toast(data.message || data.error, data.ok);
+        closeModal();
+        if (currentPath === path || currentPath.startsWith(path + '/')) {
+          currentPath = '';
+        }
+        await refreshTree();
+      };
+      document.getElementById('modalOverlay').classList.add('active');
+      if (isDir) input.focus();
+  }
+
+  async function showMoveModal(path) {
+    // Collect known dirs from cache; also load root
+    await ensureListing('');
+    const dirs = collectCachedDirs();
+    document.getElementById('modalTitle').textContent = 'Move to folder';
+    document.getElementById('modalHint').style.display = 'none';
+    const input = document.getElementById('modalInput');
+    input.style.display = 'none';
+    document.getElementById('modalOk').style.display = 'none';
+    document.getElementById('modalBody').querySelector('.dirpick')?.remove();
+
+    const pick = document.createElement('div');
+    pick.className = 'dirpick';
+    for (const d of dirs) {
+      if (d === path || path.startsWith(d + '/')) continue;
+      const item = document.createElement('div');
+      item.className = 'dirpick-item';
+      item.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>';
+      const label = document.createElement('span');
+      label.textContent = d || '/ (root)';
+      item.appendChild(label);
+      item.addEventListener('click', () => doMove(path, d));
+      pick.appendChild(item);
+    }
+    if (!pick.children.length) {
+      toast('No folders to move into', false);
+      return;
+    }
+    document.getElementById('modalBody').appendChild(pick);
+    document.getElementById('modalOverlay').classList.add('active');
+  }
+
+  function collectCachedDirs() {
+    const dirs = [''];
+    for (const [parent, items] of listingCache) {
+      for (const item of items) {
+        if (item.isDir) dirs.push(item.path);
+      }
+    }
+    // unique + sort
+    return [...new Set(dirs)].sort((a, b) => a.localeCompare(b));
+  }
+
+  async function doMove(path, destDir) {
+    const data = await api('/admin/move', { path, destDir });
+    toast(data.message || data.error, data.ok);
+    closeModal();
+    await refreshTree();
+  }
+
+  // expose for clarity (used only internally now)
+  window.showMkdirModal = showMkdirModal;
+  window.showRenameModal = showRenameModal;
+  window.showMoveModal = showMoveModal;
+  window.confirmDelete = confirmDelete;
+
+  async function enterTrashView() {
+    trashView = true;
+    clearSelection();
+    document.body.classList.add('trash-view');
+    document.getElementById('toolbarBrowse').style.display = 'none';
+    document.getElementById('toolbarZip').style.display = 'none';
+    document.getElementById('bulkBar')?.classList.remove('active');
+    document.getElementById('toolbarTrash').style.display = '';
+    document.getElementById('btnTrashNav')?.classList.add('active');
+    const crumb = document.getElementById('breadcrumb');
+    crumb.innerHTML = '<span style="color:var(--text-secondary);display:flex;align-items:center;gap:.35rem"><svg class="icon" aria-hidden="true" style="width:14px;height:14px"><use href="#i-trash-2"></use></svg> Trash</span>';
+    renderSidebar();
+    await renderTrashList();
+  }
+
+  async function leaveTrashView(opts) {
+    trashView = false;
+    document.body.classList.remove('trash-view');
+    document.getElementById('toolbarBrowse').style.display = '';
+    document.getElementById('toolbarZip').style.display = '';
+    document.getElementById('toolbarTrash').style.display = 'none';
+    document.getElementById('btnTrashNav')?.classList.remove('active');
+    if (opts && opts.skipNavigate) {
+      renderSidebar();
+      return;
+    }
+    await refreshTree();
+  }
+
+  function formatTrashDate(iso) {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  async function renderTrashList() {
+    const el = document.getElementById('fileList');
+    el.textContent = '';
+    try {
+      const res = await fetch('/admin/api/trash');
+      const data = await res.json();
+      const items = data.items || [];
+      if (!items.length) {
+        el.innerHTML = '<div class="empty-state"><svg class="icon" aria-hidden="true"><use href="#i-trash-2"></use></svg><p>Trash is empty</p></div>';
+        return;
+      }
+      const label = document.createElement('li');
+      label.className = 'section-label';
+      label.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-trash-2"></use></svg> Deleted (' + items.length + ') · permanently removed after 30 days';
+      el.appendChild(label);
+
+      // newest first
+      items.sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+      for (const it of items) {
+        const li = document.createElement('li');
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const icon = document.createElement('span');
+        icon.className = 'row-icon ' + (it.is_dir ? 'dir' : 'file');
+        icon.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-' + (it.is_dir ? 'folder' : 'file') + '"></use></svg>';
+        row.appendChild(icon);
+
+        const name = document.createElement('span');
+        name.className = 'row-name file';
+        name.style.cursor = 'default';
+        name.textContent = it.name;
+        const meta = document.createElement('span');
+        meta.className = 'trash-meta';
+        meta.textContent = (it.original_path || '') + ' · ' + formatTrashDate(it.deleted_at) +
+          (it.size ? ' · ' + formatSize(it.size) : '');
+        name.appendChild(meta);
+        row.appendChild(name);
+
+        const actions = document.createElement('span');
+        actions.className = 'row-actions';
+        actions.style.opacity = '1';
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.type = 'button';
+        restoreBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-undo-2"></use></svg> ' + 'Restore';
+        restoreBtn.addEventListener('click', async () => {
+          const data = await api('/admin/trash/restore', { id: it.id });
+          toast(data.message || data.error, data.ok);
+          if (data.ok) await renderTrashList();
+        });
+        actions.appendChild(restoreBtn);
+
+        const purgeBtn = document.createElement('button');
+        purgeBtn.type = 'button';
+        purgeBtn.className = 'del';
+        purgeBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg> ' + 'Delete';
+        purgeBtn.addEventListener('click', async () => {
+          if (!confirm(('Permanently delete "' + it.name + '"? This cannot be undone.'))) return;
+          const data = await api('/admin/trash/purge', { id: it.id });
+          toast(data.message || data.error, data.ok);
+          if (data.ok) await renderTrashList();
+        });
+        actions.appendChild(purgeBtn);
+
+        row.appendChild(actions);
+        li.appendChild(row);
+        el.appendChild(li);
+      }
+      applyLocalSearchFilter();
+    } catch (_) {
+      toast('Could not read trash', false);
+    }
+  }
+
+  document.getElementById('btnTrashNav')?.addEventListener('click', () => {
+    if (trashView) leaveTrashView();
+    else enterTrashView();
+  });
+  document.getElementById('btnBackFromTrash')?.addEventListener('click', leaveTrashView);
+  document.getElementById('btnEmptyTrash')?.addEventListener('click', async () => {
+    if (!confirm('Empty the entire trash permanently? This cannot be undone.')) return;
+    const data = await api('/admin/trash/empty', { confirm: true });
+    toast(data.message || data.error, data.ok);
+    if (data.ok) await renderTrashList();
+  });
+
+  function showShareModal(path, name, isDir) {
+    document.getElementById('modalTitle').textContent = 'Share: ' + name;
+    document.getElementById('modalHint').style.display = 'block';
+    document.getElementById('modalHint').textContent = isDir
+      ? 'Anyone with the link can browse and download this folder.'
+      : 'Anyone with the link can download this file.';
+    const input = document.getElementById('modalInput');
+    input.style.display = 'none';
+    const body = document.getElementById('modalBody');
+    body.querySelector('.dirpick')?.remove();
+    body.querySelector('.share-options')?.remove();
+    body.querySelector('.share-result')?.remove();
+    body.querySelector('.share-pass')?.remove();
+
+    const opts = document.createElement('div');
+    opts.className = 'share-options';
+    let expiryHtml =
+      '<label><input type="radio" name="shareExpiry" value="24h" checked> Expires in 24 hours</label>' +
+      '<label><input type="radio" name="shareExpiry" value="7d"> Expires in 7 days</label>' +
+      '<label><input type="radio" name="shareExpiry" value="30d"> Expires in 30 days</label>' +
+      '<label><input type="radio" name="shareExpiry" value="never"> Never expires</label>' +
+      '<label><input type="radio" name="shareExpiry" value="1download"> Valid for 1 download</label>';
+    opts.innerHTML = expiryHtml;
+    body.appendChild(opts);
+
+    const pass = document.createElement('div');
+    pass.className = 'share-pass';
+    pass.innerHTML =
+      '<label for="sharePasswordInput">Optional password</label>' +
+      '<input type="password" id="sharePasswordInput" placeholder="Leave empty for open link" autocomplete="new-password">';
+    body.appendChild(pass);
+
+    const result = document.createElement('div');
+    result.className = 'share-result';
+    result.innerHTML =
+      '<label>Public link</label><div class="row">' +
+      '<input type="text" id="shareUrlInput" readonly>' +
+      '<button type="button" id="shareCopyBtn">Copy</button></div>';
+    body.appendChild(result);
+
+    const ok = document.getElementById('modalOk');
+    ok.style.display = '';
+    ok.className = 'ok';
+    ok.textContent = 'Create link';
+    ok.onclick = async () => {
+      const selected = document.querySelector('input[name="shareExpiry"]:checked');
+      const expires = selected ? selected.value : '24h';
+      const password = document.getElementById('sharePasswordInput')?.value || '';
+      try {
+        const data = await api('/admin/share', { path, expires, password });
+        if (!data.ok) {
+          toast(data.error || 'Could not create link', false);
+          return;
+        }
+        const full = location.origin + (data.path || data.url);
+        const urlInput = document.getElementById('shareUrlInput');
+        urlInput.value = full;
+        result.classList.add('active');
+        ok.textContent = 'Done';
+        ok.onclick = closeModal;
+        document.getElementById('shareCopyBtn').onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(full);
+            toast('Link copied', true);
+          } catch (_) {
+            urlInput.select();
+            toast('Select and copy the link', true);
+          }
+        };
+        toast('Share link created', true);
+      } catch (_) {
+        toast('Could not create link', false);
+      }
+    };
+    document.getElementById('modalOverlay').classList.add('active');
+  }
+
+  window.showShareModal = showShareModal;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('previewOverlay').classList.contains('active')) {
+      closePreview();
+      return;
+    }
+    closeModal();
+  }
+  if (e.key === 'Enter' && document.getElementById('modalOverlay').classList.contains('active')) {
+    const ok = document.getElementById('modalOk');
+    if (ok.style.display !== 'none' && ok.onclick) ok.click();
+  }
+});
+
+document.getElementById('btnLogout')?.addEventListener('click', async () => {
+  try {
+    await fetch('/api/logout', { method: 'POST' });
+  } catch (_) {}
+  location.href = '/login';
+});
+
+document.getElementById('btnSelectAll')?.addEventListener('click', () => {
+  const items = listingCache.get(currentPath || '') || [];
+  const allSelected = items.length && items.every(i => selectedPaths.has(i.path));
+  if (allSelected) {
+    clearSelection();
+  } else {
+    for (const i of items) selectedPaths.add(i.path);
+    updateBulkBar();
+  }
+});
+document.getElementById('btnZipSelection')?.addEventListener('click', () => downloadZip([...selectedPaths]));
+document.getElementById('btnBulkZip')?.addEventListener('click', () => downloadZip([...selectedPaths]));
+document.getElementById('btnBulkClear')?.addEventListener('click', clearSelection);
+
+document.getElementById('btnBulkDelete')?.addEventListener('click', async () => {
+  const paths = [...selectedPaths];
+  if (!paths.length) return;
+  if (!confirm('Move ' + paths.length + ' item(s) to trash?')) return;
+  try {
+    const data = await api('/admin/bulk/delete', { paths, confirm: true });
+    if (!data.ok) {
+      toast(data.error || 'Bulk delete failed', false);
+      return;
+    }
+    toast(data.message || 'Moved to trash', true);
+    clearSelection();
+    await refreshTree();
+  } catch (_) {
+    toast('Bulk delete failed', false);
+  }
+});
+
+document.getElementById('btnBulkMove')?.addEventListener('click', () => {
+  const paths = [...selectedPaths];
+  if (!paths.length) return;
+  showBulkMoveModal(paths);
+});
+
+function showBulkMoveModal(paths) {
+  document.getElementById('modalTitle').textContent = 'Move ' + paths.length + ' item(s)';
+  document.getElementById('modalHint').style.display = 'block';
+  document.getElementById('modalHint').textContent = 'Choose destination folder';
+  document.getElementById('modalInput').style.display = 'none';
+  const body = document.getElementById('modalBody');
+  body.querySelector('.dirpick')?.remove();
+  const pick = document.createElement('div');
+  pick.className = 'dirpick';
+  const root = document.createElement('div');
+  root.className = 'dirpick-item';
+  root.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg> / (root)';
+  root.addEventListener('click', () => doBulkMove(paths, ''));
+  pick.appendChild(root);
+  const addDirs = (parentPath, depth) => {
+    const items = (listingCache.get(parentPath) || []).filter(i => i.isDir);
+    for (const d of items) {
+      if (paths.includes(d.path)) continue;
+      const el = document.createElement('div');
+      el.className = 'dirpick-item';
+      el.style.paddingLeft = (0.75 + depth * 0.75) + 'rem';
+      el.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg> ';
+      el.appendChild(document.createTextNode(d.name));
+      el.addEventListener('click', () => doBulkMove(paths, d.path));
+      pick.appendChild(el);
+    }
+  };
+  addDirs('', 0);
+  for (const ep of [...expandedPaths].sort()) {
+    if (ep) addDirs(ep, ep.split('/').length);
+  }
+  body.appendChild(pick);
+  document.getElementById('modalOk').style.display = 'none';
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+async function doBulkMove(paths, destDir) {
+  closeModal();
+  try {
+    const data = await api('/admin/bulk/move', { paths, destDir });
+    if (!data.ok) {
+      toast(data.error || 'Bulk move failed', false);
+      return;
+    }
+    toast(data.message || 'Moved', true);
+    clearSelection();
+    await refreshTree();
+  } catch (_) {
+    toast('Bulk move failed', false);
+  }
+}
+
+function showChangePasswordModal() {
+  closeModal();
+  document.getElementById('modalTitle').textContent = 'Change password';
+  document.getElementById('modalHint').style.display = 'none';
+  document.getElementById('modalInput').style.display = 'none';
+  document.getElementById('modalBox')?.classList.remove('wide');
+  const body = document.getElementById('modalBody');
+  const panel = document.createElement('div');
+  panel.className = 'password-panel form-grid';
+  panel.innerHTML =
+    '<div class="field"><label>Current password</label><input type="password" id="pwCurrent" autocomplete="current-password"></div>' +
+    '<div class="field"><label>New password (min 8)</label><input type="password" id="pwNew" autocomplete="new-password"></div>' +
+    '<div class="field"><label>Confirm new password</label><input type="password" id="pwConfirm" autocomplete="new-password"></div>';
+  body.appendChild(panel);
+  const ok = document.getElementById('modalOk');
+  ok.style.display = '';
+  ok.className = 'ok';
+  ok.textContent = 'Update';
+  ok.onclick = async () => {
+    const current_password = document.getElementById('pwCurrent').value;
+    const new_password = document.getElementById('pwNew').value;
+    const confirm = document.getElementById('pwConfirm').value;
+    if (new_password !== confirm) {
+      toast('New passwords do not match', false);
+      return;
+    }
+    try {
+      const data = await api('/api/password', { current_password, new_password });
+      if (!data.ok) {
+        toast(data.error || 'Could not update password', false);
+        return;
+      }
+      toast('Password updated — sign in again', true);
+      closeModal();
+      location.href = '/login';
+    } catch (_) {
+      toast('Could not update password', false);
+    }
+  };
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+async function showUsersModal() {
+  closeModal();
+  document.getElementById('modalTitle').textContent = 'Users';
+  document.getElementById('modalHint').style.display = 'block';
+  document.getElementById('modalHint').textContent = 'Add accounts, reset passwords, or change roles.';
+  document.getElementById('modalInput').style.display = 'none';
+  document.getElementById('modalBox')?.classList.add('wide');
+  const body = document.getElementById('modalBody');
+  const panel = document.createElement('div');
+  panel.className = 'users-panel';
+  panel.innerHTML = '<div class="users-list" id="usersList"></div>' +
+    '<div class="form-grid">' +
+    '<div class="field"><label>New username</label><input type="text" id="newUserName" autocomplete="off"></div>' +
+    '<div class="field"><label>Password (min 8)</label><input type="password" id="newUserPass" autocomplete="new-password"></div>' +
+    '<div class="field"><label>Role</label><select id="newUserRole"><option value="viewer">viewer</option><option value="admin">admin</option></select></div>' +
+    '</div>';
+  body.appendChild(panel);
+  const ok = document.getElementById('modalOk');
+  ok.style.display = '';
+  ok.className = 'ok';
+  ok.textContent = 'Add user';
+  ok.onclick = async () => {
+    const username = document.getElementById('newUserName').value.trim();
+    const password = document.getElementById('newUserPass').value;
+    const role = document.getElementById('newUserRole').value;
+    try {
+      const data = await api('/admin/users', { username, password, role });
+      if (!data.ok) {
+        toast(data.error || 'Could not create user', false);
+        return;
+      }
+      toast('User created', true);
+      document.getElementById('newUserName').value = '';
+      document.getElementById('newUserPass').value = '';
+      await renderUsersList();
+    } catch (_) {
+      toast('Could not create user', false);
+    }
+  };
+  document.getElementById('modalOverlay').classList.add('active');
+  await renderUsersList();
+}
+
+async function renderUsersList() {
+  const list = document.getElementById('usersList');
+  if (!list) return;
+  list.textContent = '';
+  try {
+    const res = await fetch('/admin/api/users');
+    const data = await res.json();
+    if (!data.ok) {
+      toast(data.error || 'Could not load users', false);
+      return;
+    }
+    for (const u of data.users || []) {
+      const row = document.createElement('div');
+      row.className = 'u-row';
+      const name = document.createElement('span');
+      name.className = 'u-name';
+      name.textContent = u.username;
+      const role = document.createElement('span');
+      role.className = 'u-role';
+      role.textContent = u.role;
+      const actions = document.createElement('span');
+      actions.className = 'u-actions';
+      const pw = document.createElement('button');
+      pw.type = 'button';
+      pw.textContent = 'Password';
+      pw.addEventListener('click', async () => {
+        const password = prompt('New password for ' + u.username + ' (min 8):');
+        if (!password) return;
+        const data = await api('/admin/users/password', { username: u.username, password });
+        toast(data.ok ? (data.message || 'Updated') : (data.error || 'Failed'), data.ok);
+      });
+      const roleBtn = document.createElement('button');
+      roleBtn.type = 'button';
+      roleBtn.textContent = u.role === 'admin' ? 'Make viewer' : 'Make admin';
+      roleBtn.addEventListener('click', async () => {
+        const role = u.role === 'admin' ? 'viewer' : 'admin';
+        if (!confirm('Set ' + u.username + ' to ' + role + '?')) return;
+        const data = await api('/admin/users/role', { username: u.username, role });
+        toast(data.ok ? 'Role updated' : (data.error || 'Failed'), data.ok);
+        if (data.ok) await renderUsersList();
+      });
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'danger';
+      del.textContent = 'Delete';
+      del.addEventListener('click', async () => {
+        if (!confirm('Delete user ' + u.username + '?')) return;
+        const data = await api('/admin/users/delete', { username: u.username });
+        toast(data.ok ? 'Deleted' : (data.error || 'Failed'), data.ok);
+        if (data.ok) await renderUsersList();
+      });
+      actions.appendChild(pw);
+      actions.appendChild(roleBtn);
+      actions.appendChild(del);
+      row.appendChild(name);
+      row.appendChild(role);
+      row.appendChild(actions);
+      list.appendChild(row);
+    }
+  } catch (_) {
+    toast('Could not load users', false);
+  }
+}
+
+async function showSharesModal() {
+  closeModal();
+  document.getElementById('modalTitle').textContent = 'Active shares';
+  document.getElementById('modalHint').style.display = 'block';
+  document.getElementById('modalHint').textContent = 'Revoke links that should no longer work.';
+  document.getElementById('modalInput').style.display = 'none';
+  document.getElementById('modalBox')?.classList.add('wide');
+  const body = document.getElementById('modalBody');
+  const panel = document.createElement('div');
+  panel.className = 'shares-panel';
+  panel.innerHTML = '<div class="shares-list" id="sharesList"></div>';
+  body.appendChild(panel);
+  document.getElementById('modalOk').style.display = 'none';
+  document.getElementById('modalOverlay').classList.add('active');
+  await renderSharesList();
+}
+
+async function renderSharesList() {
+  const list = document.getElementById('sharesList');
+  if (!list) return;
+  list.textContent = '';
+  try {
+    const res = await fetch('/admin/api/shares');
+    const data = await res.json();
+    if (!data.ok) {
+      toast(data.error || 'Could not load shares', false);
+      return;
+    }
+    const shares = data.shares || [];
+    if (!shares.length) {
+      list.innerHTML = '<div class="s-row"><span class="s-name">No active shares</span></div>';
+      return;
+    }
+    for (const s of shares) {
+      const row = document.createElement('div');
+      row.className = 's-row';
+      const name = document.createElement('span');
+      name.className = 's-name';
+      name.textContent = s.name + (s.is_dir ? ' (folder)' : '') + (s.has_password ? ' · locked' : '') + ' · ' + s.path;
+      name.title = location.origin + '/s/' + s.token;
+      const actions = document.createElement('span');
+      actions.className = 's-actions';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.textContent = 'Copy';
+      copy.addEventListener('click', async () => {
+        const url = location.origin + '/s/' + s.token;
+        try {
+          await navigator.clipboard.writeText(url);
+          toast('Copied', true);
+        } catch (_) {
+          toast(url, true);
+        }
+      });
+      const rev = document.createElement('button');
+      rev.type = 'button';
+      rev.className = 'danger';
+      rev.textContent = 'Revoke';
+      rev.addEventListener('click', async () => {
+        if (!confirm('Revoke share for ' + s.name + '?')) return;
+        const data = await api('/admin/share/revoke', { token: s.token });
+        toast(data.ok ? 'Revoked' : (data.error || 'Failed'), data.ok);
+        if (data.ok) await renderSharesList();
+      });
+      actions.appendChild(copy);
+      actions.appendChild(rev);
+      row.appendChild(name);
+      row.appendChild(actions);
+      list.appendChild(row);
+    }
+  } catch (_) {
+    toast('Could not load shares', false);
+  }
+}
+
+document.getElementById('btnChangePassword')?.addEventListener('click', showChangePasswordModal);
+document.getElementById('btnUsersNav')?.addEventListener('click', showUsersModal);
+document.getElementById('btnSharesNav')?.addEventListener('click', showSharesModal);
+
+function applyLocalSearchFilter() {
+  const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  const list = document.getElementById('fileList');
+  if (!list) return;
+  list.querySelectorAll(':scope > li').forEach(li => {
+    if (li.classList.contains('section-label')) {
+      li.style.display = '';
+      return;
+    }
+    if (!q) {
+      li.style.display = '';
+      return;
+    }
+    const nameEl = li.querySelector('.row-name');
+    const text = (nameEl?.childNodes[0]?.textContent || nameEl?.textContent || '').toLowerCase();
+    li.style.display = text.includes(q) ? '' : 'none';
+  });
+  // Hide empty section labels when all rows under them are hidden
+  let pendingLabel = null;
+  let anyVisible = false;
+  list.querySelectorAll(':scope > li').forEach(li => {
+    if (li.classList.contains('section-label')) {
+      if (pendingLabel) pendingLabel.style.display = anyVisible ? '' : 'none';
+      pendingLabel = li;
+      anyVisible = false;
+      return;
+    }
+    if (li.style.display !== 'none') anyVisible = true;
+  });
+  if (pendingLabel) pendingLabel.style.display = anyVisible ? '' : 'none';
+}
+
+function clearGlobalSearch() {
+  const panel = document.getElementById('searchGlobal');
+  const list = document.getElementById('searchGlobalList');
+  if (panel) panel.classList.add('hidden');
+  if (list) list.textContent = '';
+}
+
+function renderGlobalHits(hits) {
+  const panel = document.getElementById('searchGlobal');
+  const list = document.getElementById('searchGlobalList');
+  const count = document.getElementById('searchGlobalCount');
+  if (!panel || !list) return;
+  list.textContent = '';
+  if (!hits.length) {
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  count.textContent = '(' + hits.length + ')';
+  for (const hit of hits) {
+    list.appendChild(buildSearchHitRow(hit));
+  }
+}
+
+function buildSearchHitRow(hit) {
+  const li = document.createElement('li');
+  const row = document.createElement('div');
+  row.className = 'row';
+
+  const icon = document.createElement('span');
+  icon.className = 'row-icon ' + (hit.isDir ? 'dir' : 'file');
+  icon.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-' + (hit.isDir ? 'folder' : fileIcon(hit.name)) + '"></use></svg>';
+  row.appendChild(icon);
+
+  const name = document.createElement('span');
+  name.className = 'row-name ' + (hit.isDir ? 'dir' : 'file');
+  name.textContent = hit.name;
+  const meta = document.createElement('span');
+  meta.className = 'trash-meta';
+  meta.textContent = hit.path + (hit.size ? ' · ' + formatSize(hit.size) : '');
+  name.appendChild(meta);
+  if (hit.isDir) {
+    name.addEventListener('click', async () => {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('searchClear').classList.remove('visible');
+      clearGlobalSearch();
+      if (trashView) await leaveTrashView();
+      await navigate(hit.path);
+    });
+  } else {
+    name.addEventListener('click', () => openPreview(hit));
+  }
+  row.appendChild(name);
+
+  const actions = document.createElement('span');
+  actions.className = 'row-actions';
+  actions.style.opacity = '1';
+  if (!hit.isDir) {
+    const dl = document.createElement('a');
+    dl.className = 'action-btn dl';
+    dl.href = fileURL('download', hit.path);
+    dl.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>';
+    actions.appendChild(dl);
+  }
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-folder-open"></use></svg>';
+  go.title = 'Open folder';
+  go.addEventListener('click', async () => {
+    const parent = hit.path.includes('/') ? hit.path.slice(0, hit.path.lastIndexOf('/')) : '';
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchClear').classList.remove('visible');
+    clearGlobalSearch();
+    if (trashView) await leaveTrashView();
+    await navigate(hit.isDir ? hit.path : parent);
+  });
+  actions.appendChild(go);
+  row.appendChild(actions);
+  li.appendChild(row);
+  return li;
+}
+
+async function runDeepSearch(q) {
+  const seq = ++searchSeq;
+  if (q.length < 2) {
+    clearGlobalSearch();
+    return;
+  }
+  if (trashView) {
+    clearGlobalSearch();
+    return;
+  }
+  try {
+    const res = await fetch(SEARCH_URL + '?q=' + encodeURIComponent(q));
+    if (!res.ok) throw new Error('search failed');
+    const data = await res.json();
+    if (seq !== searchSeq) return;
+    renderGlobalHits(data.results || []);
+  } catch (_) {
+    if (seq === searchSeq) clearGlobalSearch();
+  }
+}
+
+const searchInput = document.getElementById('searchInput');
+const searchClear = document.getElementById('searchClear');
+searchInput?.addEventListener('input', () => {
+  const q = searchInput.value.trim();
+  searchClear?.classList.toggle('visible', q.length > 0);
+  applyLocalSearchFilter();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => runDeepSearch(q), 280);
+});
+searchClear?.addEventListener('click', () => {
+  searchInput.value = '';
+  searchClear.classList.remove('visible');
+  applyLocalSearchFilter();
+  clearGlobalSearch();
+  searchInput.focus();
+});
+
+refreshTree();
+</script>
+</body>
+</html>

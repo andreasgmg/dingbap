@@ -1,0 +1,14 @@
+# Build
+Dockerfile
+docker-compose*.yml
+.dockerignore
+.git
+.gitignore
+*.md
+public/
+storage/
+users.json
+users.json.tmp
+data/
+dingbap
+*.pem

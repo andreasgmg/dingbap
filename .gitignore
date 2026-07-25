@@ -1,0 +1,17 @@
+# Local data (never commit)
+/storage/
+/public/
+/users.json
+/users.json.tmp
+/shares.json
+/shares.json.tmp
+/sessions.json
+/sessions.json.tmp
+/.uploads/
+/.dingbap/
+*.pem
+/dingbap
+/filarkiv
+/data/
+/default.pgo
+*.pgo
