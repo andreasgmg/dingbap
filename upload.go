@@ -80,11 +80,7 @@ func (um *uploadManager) saveMeta(m *uploadMeta) error {
 	if err != nil {
 		return err
 	}
-	tmp := um.metaPath(m.ID) + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, um.metaPath(m.ID))
+	return writeFileAtomic(um.metaPath(m.ID), data, 0600)
 }
 
 func (um *uploadManager) readMetaDisk(id string) (*uploadMeta, error) {
@@ -170,11 +166,28 @@ func (um *uploadManager) receivedList(a *activeUpload) []int {
 	return got
 }
 
-func (um *uploadManager) init(path, name string, size, chunkSize int64, createdBy string) (*uploadMeta, []int, error) {
-	name = sanitizeName(name)
-	if name == "" {
+func (um *uploadManager) init(destPath, name string, size, chunkSize int64, createdBy string) (*uploadMeta, []int, error) {
+	// Folder uploads may pass a relative path (e.g. "Album/vacation/img.jpg").
+	// Validate segments before Clean so ".." cannot collapse into a benign name.
+	rel := strings.ReplaceAll(strings.Trim(name, "/"), `\`, `/`)
+	if rel == "" {
 		return nil, nil, fmt.Errorf("invalid filename")
 	}
+	parts := strings.Split(rel, "/")
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." || strings.HasPrefix(part, ".") {
+			return nil, nil, fmt.Errorf("invalid filename")
+		}
+		if sanitizeName(part) != part {
+			return nil, nil, fmt.Errorf("invalid filename")
+		}
+	}
+	base := parts[len(parts)-1]
+	subDir := ""
+	if len(parts) > 1 {
+		subDir = strings.Join(parts[:len(parts)-1], "/")
+	}
+
 	if size < 0 || size > maxUploadBytes {
 		return nil, nil, fmt.Errorf("file too large (max %d MB)", maxUploadBytes>>20)
 	}
@@ -185,25 +198,34 @@ func (um *uploadManager) init(path, name string, size, chunkSize int64, createdB
 		chunkSize = maxChunkSize
 	}
 
-	if isTrashPath(path) {
+	destRel := strings.Trim(destPath, "/")
+	if subDir != "" {
+		destRel = pathJoin(destRel, subDir)
+	}
+	if isTrashPath(destRel) || isTrashPath(pathJoin(destRel, base)) {
 		return nil, nil, fmt.Errorf("cannot upload into trash")
 	}
-	destDir, err := safePath(path)
+
+	// Ensure destination directory exists (create nested folders for folder upload).
+	destDir, err := safePath(destRel)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid path")
 	}
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return nil, nil, fmt.Errorf("failed to create destination folders")
+	}
 	info, err := os.Stat(destDir)
 	if err != nil || !info.IsDir() {
-		return nil, nil, fmt.Errorf("destination must be an existing directory")
+		return nil, nil, fmt.Errorf("destination must be a directory")
 	}
 
-	finalRel := pathJoin(strings.Trim(path, "/"), name)
+	finalRel := pathJoin(destRel, base)
 	finalAbs, err := safePath(finalRel)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid destination")
 	}
 	if _, err := os.Stat(finalAbs); err == nil {
-		return nil, nil, fmt.Errorf("%s already exists", name)
+		return nil, nil, fmt.Errorf("%s already exists", base)
 	} else if !os.IsNotExist(err) {
 		return nil, nil, fmt.Errorf("failed to check destination")
 	}
@@ -224,8 +246,8 @@ func (um *uploadManager) init(path, name string, size, chunkSize int64, createdB
 
 	m := &uploadMeta{
 		ID:          id,
-		Path:        strings.Trim(path, "/"),
-		Name:        name,
+		Path:        destRel,
+		Name:        base,
 		Size:        size,
 		ChunkSize:   chunkSize,
 		TotalChunks: totalChunks,
@@ -477,8 +499,7 @@ func handleUploadInit(w http.ResponseWriter, r *http.Request) {
 		Size      int64  `json:"size"`
 		ChunkSize int64  `json:"chunkSize"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	createdBy := ""
@@ -600,8 +621,7 @@ func handleUploadComplete(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		UploadID string `json:"uploadId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	name, err := uploads.complete(body.UploadID)
@@ -614,6 +634,7 @@ func handleUploadComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, fmt.Sprintf("Uploaded %s", name))
+	auditLog(actorName(r), "upload", name, r)
 	invalidateListingCache()
 }
 
@@ -625,8 +646,7 @@ func handleUploadAbort(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		UploadID string `json:"uploadId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if err := uploads.abort(body.UploadID); err != nil {

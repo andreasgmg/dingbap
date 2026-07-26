@@ -68,7 +68,7 @@ func TestShareFolderAndPassword(t *testing.T) {
 	}
 	shares = store
 
-	sh, err := store.create("docs", "admin", shareExpiry7d, "secret")
+	sh, err := store.create("docs", "admin", shareExpiry7d, "secret", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestShareFolderAndPassword(t *testing.T) {
 		t.Fatal("password verify failed")
 	}
 
-	if _, err := store.create("docs", "admin", shareExpiry1Download, ""); err != nil {
+	if _, err := store.create("docs", "admin", shareExpiry1Download, "", ""); err != nil {
 		t.Fatalf("1download should allow folders: %v", err)
 	}
 }

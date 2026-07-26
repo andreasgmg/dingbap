@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/zip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -26,8 +25,7 @@ func handleBulkDelete(w http.ResponseWriter, r *http.Request) {
 		Paths   []string `json:"paths"`
 		Confirm bool     `json:"confirm"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if !body.Confirm {
@@ -84,8 +82,7 @@ func handleBulkMove(w http.ResponseWriter, r *http.Request) {
 		Paths   []string `json:"paths"`
 		DestDir string   `json:"destDir"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	paths := uniqueNonEmptyPaths(body.Paths)
@@ -178,8 +175,7 @@ func handleZip(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Paths []string `json:"paths"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	paths := uniqueNonEmptyPaths(body.Paths)
@@ -225,7 +221,7 @@ func streamZip(w http.ResponseWriter, downloadName string, relPaths []string) er
 		if rel == "" || isTrashPath(rel) {
 			continue
 		}
-		abs, err := safePath(rel)
+		abs, err := assertUserContentPath(rel)
 		if err != nil {
 			return fmt.Errorf("invalid path %q", rel)
 		}

@@ -46,10 +46,20 @@ func cachedRealRoot(storageDir string) (string, bool) {
 	return "", false
 }
 
-// safePath resolves requestedPath under rootDir and rejects traversal / symlink escapes.
-// It is used for every file and directory operation that touches storage.
+// safePath resolves a *user-content* path under rootDir and rejects traversal,
+// symlink escapes, and any path segment that begins with '.' (e.g. .dingbap,
+// .trash, .uploads, .hidden). After symlink resolution the final path relative
+// to the storage root is checked again so a link named "evil" → ".dingbap"
+// cannot expose metadata. App metadata must use filepath.Join on the storage
+// root directly — never safePath.
 func safePath(rel string) (string, error) {
 	return resolveUnderRoot(rootDir, rel)
+}
+
+// assertUserContentPath is an explicit alias for safePath for call sites that
+// want to document "this must never touch system/meta paths".
+func assertUserContentPath(rel string) (string, error) {
+	return safePath(rel)
 }
 
 func resolveUnderRoot(storageDir, requestedPath string) (string, error) {
@@ -81,14 +91,21 @@ func resolveUnderRoot(storageDir, requestedPath string) (string, error) {
 		return realRoot, nil
 	}
 
-	for _, part := range strings.Split(cleaned, "/") {
+	parts := strings.Split(cleaned, "/")
+	for _, part := range parts {
+		if part == "" || part == "." {
+			continue
+		}
 		if part == ".." {
 			return "", fmt.Errorf("path traversal detected")
+		}
+		// Deny .dingbap, .trash, and any other dotfile/dotdir segment in the request.
+		if strings.HasPrefix(part, ".") {
+			return "", fmt.Errorf("hidden path denied")
 		}
 	}
 
 	current := realRoot
-	parts := strings.Split(cleaned, "/")
 	for i, part := range parts {
 		if part == "" || part == "." {
 			continue
@@ -111,6 +128,9 @@ func resolveUnderRoot(storageDir, requestedPath string) (string, error) {
 			if err != nil || !withinRoot(realRoot, absCandidate) {
 				return "", fmt.Errorf("path traversal detected")
 			}
+			if err := rejectHiddenUnderRoot(realRoot, absCandidate); err != nil {
+				return "", err
+			}
 			return absCandidate, nil
 		}
 
@@ -122,6 +142,9 @@ func resolveUnderRoot(storageDir, requestedPath string) (string, error) {
 			if !withinRoot(realRoot, resolved) {
 				return "", fmt.Errorf("path traversal detected")
 			}
+			if err := rejectHiddenUnderRoot(realRoot, resolved); err != nil {
+				return "", err
+			}
 			current = resolved
 			continue
 		}
@@ -129,7 +152,37 @@ func resolveUnderRoot(storageDir, requestedPath string) (string, error) {
 		current = absNext
 	}
 
+	if err := rejectHiddenUnderRoot(realRoot, current); err != nil {
+		return "", err
+	}
 	return current, nil
+}
+
+// rejectHiddenUnderRoot denies abs if its path relative to root contains any
+// segment starting with '.' (.dingbap, .trash, …), including after symlink resolution.
+func rejectHiddenUnderRoot(root, abs string) error {
+	rel, err := filepath.Rel(root, abs)
+	if err != nil {
+		return fmt.Errorf("invalid path")
+	}
+	if rel == "." {
+		return nil
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return fmt.Errorf("path traversal detected")
+	}
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		if part == "" || part == "." {
+			continue
+		}
+		if part == ".." {
+			return fmt.Errorf("path traversal detected")
+		}
+		if strings.HasPrefix(part, ".") {
+			return fmt.Errorf("hidden path denied")
+		}
+	}
+	return nil
 }
 
 // withinRoot reports whether target is root or a path inside it.

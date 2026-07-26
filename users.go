@@ -21,9 +21,13 @@ const (
 )
 
 type User struct {
-	Username     string `json:"username"`
-	PasswordHash string `json:"password_hash"`
-	Role         string `json:"role"`
+	Username     string   `json:"username"`
+	PasswordHash string   `json:"password_hash"`
+	Role         string   `json:"role"`
+	// Optional admin TOTP (secrets stay in users.json on disk; never sent to third parties).
+	TOTPSecret       string   `json:"totp_secret,omitempty"`
+	TOTPEnabled      bool     `json:"totp_enabled,omitempty"`
+	TOTPRecoveryHash []string `json:"totp_recovery_hashes,omitempty"`
 }
 
 type userStore struct {
@@ -57,11 +61,7 @@ func (s *userStore) save() error {
 	if err != nil {
 		return err
 	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	return writeFileAtomic(s.path, data, 0600)
 }
 
 func (s *userStore) empty() bool {
@@ -115,6 +115,9 @@ func (s *userStore) authenticate(username, password string) (*User, error) {
 		cp := *u
 		return &cp, nil
 	}
+	// Unknown username: still run a full Argon2 verify against a dummy hash so
+	// response timing does not reveal whether the account exists.
+	_, _ = verifyPassword(dummyPasswordHash(), password)
 	return nil, errInvalidCredentials
 }
 
@@ -136,7 +139,11 @@ func (s *userStore) listPublic() []User {
 	defer s.mu.RUnlock()
 	out := make([]User, len(s.Users))
 	for i, u := range s.Users {
-		out[i] = User{Username: u.Username, Role: u.Role}
+		out[i] = User{
+			Username:    u.Username,
+			Role:        u.Role,
+			TOTPEnabled: u.TOTPEnabled && u.TOTPSecret != "",
+		}
 	}
 	return out
 }
@@ -205,6 +212,11 @@ func (s *userStore) setRole(username, role string) error {
 		}
 	}
 	s.Users[idx].Role = role
+	if role != roleAdmin {
+		s.Users[idx].TOTPSecret = ""
+		s.Users[idx].TOTPEnabled = false
+		s.Users[idx].TOTPRecoveryHash = nil
+	}
 	return s.save()
 }
 
@@ -237,16 +249,115 @@ func (s *userStore) deleteUser(username string) error {
 	return s.save()
 }
 
+func (s *userStore) totpEnabled(username string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, u := range s.Users {
+		if strings.EqualFold(u.Username, username) {
+			return u.Role == roleAdmin && u.TOTPEnabled && u.TOTPSecret != ""
+		}
+	}
+	return false
+}
+
+func (s *userStore) totpSecret(username string) (secret string, hashes []string, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, u := range s.Users {
+		if strings.EqualFold(u.Username, username) {
+			if !(u.Role == roleAdmin && u.TOTPEnabled && u.TOTPSecret != "") {
+				return "", nil, false
+			}
+			h := append([]string(nil), u.TOTPRecoveryHash...)
+			return u.TOTPSecret, h, true
+		}
+	}
+	return "", nil, false
+}
+
+func (s *userStore) enableTOTP(username, secret string, recoveryHashes []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.Users {
+		if !strings.EqualFold(s.Users[i].Username, username) {
+			continue
+		}
+		if s.Users[i].Role != roleAdmin {
+			return errors.New("TOTP is only available for admin accounts")
+		}
+		s.Users[i].TOTPSecret = secret
+		s.Users[i].TOTPEnabled = true
+		s.Users[i].TOTPRecoveryHash = append([]string(nil), recoveryHashes...)
+		return s.save()
+	}
+	return fmt.Errorf("user %q not found", username)
+}
+
+func (s *userStore) disableTOTP(username string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.Users {
+		if !strings.EqualFold(s.Users[i].Username, username) {
+			continue
+		}
+		s.Users[i].TOTPSecret = ""
+		s.Users[i].TOTPEnabled = false
+		s.Users[i].TOTPRecoveryHash = nil
+		return s.save()
+	}
+	return fmt.Errorf("user %q not found", username)
+}
+
+// consumeRecoveryCode removes a matching recovery hash after a successful use.
+func (s *userStore) consumeRecoveryCode(username, code string) bool {
+	sum := hashRecoveryCode(code)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.Users {
+		if !strings.EqualFold(s.Users[i].Username, username) {
+			continue
+		}
+		for j, h := range s.Users[i].TOTPRecoveryHash {
+			if subtle.ConstantTimeCompare([]byte(h), []byte(sum)) == 1 {
+				s.Users[i].TOTPRecoveryHash = append(s.Users[i].TOTPRecoveryHash[:j], s.Users[i].TOTPRecoveryHash[j+1:]...)
+				_ = s.save()
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
 var errInvalidCredentials = errors.New("invalid username or password")
 
-// Argon2id parameters (OWASP-ish, tuned for a small self-hosted box).
+// Argon2id parameters (OWASP-oriented; t raised for offline-crack resistance).
 const (
-	argonTime    = 1
+	argonTime    = 3
 	argonMemory  = 64 * 1024
 	argonThreads = 4
 	argonKeyLen  = 32
 	argonSaltLen = 16
 )
+
+var (
+	dummyHashOnce sync.Once
+	dummyHash     string
+)
+
+// dummyPasswordHash returns a real Argon2id hash used only to equalize login timing.
+func dummyPasswordHash() string {
+	dummyHashOnce.Do(func() {
+		h, err := hashPassword("dingbap-dummy-password-not-a-real-account")
+		if err != nil {
+			// Fallback encoding so verifyPassword still does work if RNG fails at init.
+			dummyHash = "$argon2id$v=19$m=65536,t=3,p=4$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			return
+		}
+		dummyHash = h
+	})
+	return dummyHash
+}
 
 func hashPassword(password string) (string, error) {
 	salt := make([]byte, argonSaltLen)

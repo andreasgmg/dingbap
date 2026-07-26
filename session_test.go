@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -133,5 +136,95 @@ func TestLoginFailuresReapPartial(t *testing.T) {
 	sm.mu.Unlock()
 	if ok {
 		t.Fatal("partial failure should be reaped after window")
+	}
+}
+
+func TestClientIPHonorsProxyHeaders(t *testing.T) {
+	prev := trustProxy
+	trustProxy = true
+	t.Cleanup(func() { trustProxy = prev })
+
+	mk := func(remote string, hdr http.Header) *http.Request {
+		r := &http.Request{RemoteAddr: remote, Header: make(http.Header)}
+		for k, vals := range hdr {
+			for _, v := range vals {
+				r.Header.Add(k, v)
+			}
+		}
+		return r
+	}
+	if got := clientIP(mk("10.0.0.1:1234", nil)); got != "10.0.0.1" {
+		t.Fatalf("remote: %q", got)
+	}
+	h := http.Header{}
+	h.Set("X-Real-IP", "203.0.113.9")
+	h.Set("X-Forwarded-For", "198.51.100.2, 10.0.0.1")
+	if got := clientIP(mk("10.0.0.1:1234", h)); got != "203.0.113.9" {
+		t.Fatalf("X-Real-IP preferred: %q", got)
+	}
+	h2 := http.Header{}
+	h2.Set("X-Forwarded-For", "198.51.100.7, 10.0.0.1")
+	if got := clientIP(mk("10.0.0.1:1234", h2)); got != "198.51.100.7" {
+		t.Fatalf("XFF leftmost: %q", got)
+	}
+	h3 := http.Header{}
+	h3.Set("X-Forwarded-For", "not-an-ip")
+	if got := clientIP(mk("10.0.0.1:99", h3)); got != "10.0.0.1" {
+		t.Fatalf("fallback remote: %q", got)
+	}
+}
+
+func TestClientIPIgnoresProxyHeadersUnlessTrusted(t *testing.T) {
+	prev := trustProxy
+	trustProxy = false
+	t.Cleanup(func() { trustProxy = prev })
+
+	r := &http.Request{
+		RemoteAddr: "10.0.0.1:1234",
+		Header:     http.Header{"X-Real-IP": []string{"203.0.113.9"}},
+	}
+	if got := clientIP(r); got != "10.0.0.1" {
+		t.Fatalf("untrusted proxy headers must be ignored, got %q", got)
+	}
+}
+
+func TestSessionPersistConcurrentNoLostWrites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sessions.json")
+	sm := newSessionManager(path, false)
+
+	const n = 40
+	var wg sync.WaitGroup
+	wg.Add(n)
+	ids := make([]string, n)
+	var mu sync.Mutex
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			id, err := sm.create(fmt.Sprintf("u%d", i), roleViewer)
+			if err != nil {
+				t.Errorf("create: %v", err)
+				return
+			}
+			mu.Lock()
+			ids[i] = id
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+
+	sm2 := newSessionManager(path, false)
+	missing := 0
+	for _, id := range ids {
+		if id == "" {
+			missing++
+			continue
+		}
+		if _, ok := sm2.get(id); !ok {
+			missing++
+		}
+	}
+	if missing != 0 {
+		t.Fatalf("lost %d/%d sessions after concurrent create", missing, n)
 	}
 }

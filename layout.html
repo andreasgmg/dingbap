@@ -62,6 +62,12 @@ a:hover{color:var(--accent-hover)}
 .sidebar-content::-webkit-scrollbar-track{background:transparent}
 .sidebar-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .sidebar-content::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+.sidebar-disk{flex-shrink:0;padding:.65rem .85rem;border-top:1px solid var(--border);font-size:.72rem;color:var(--text-muted);line-height:1.35}
+.sidebar-disk .disk-bar{height:4px;background:var(--bg-tertiary);border-radius:2px;margin:.4rem 0 .35rem;overflow:hidden}
+.sidebar-disk .disk-bar > span{display:block;height:100%;background:var(--accent);border-radius:2px;max-width:100%}
+.sidebar-disk.disk-warn .disk-bar > span{background:var(--danger)}
+.sidebar-disk .disk-label{display:flex;align-items:center;gap:.35rem}
+.sidebar-disk .disk-label svg.icon{width:12px;height:12px;flex-shrink:0}
 
 .stree{list-style:none;user-select:none}
 .stree li{position:relative}
@@ -232,6 +238,14 @@ body.trash-view #toolbarZip{display:none !important}
 .share-pass label{display:block;font-size:.75rem;color:var(--text-muted);margin-bottom:.35rem}
 .form-grid label{display:block;font-size:.75rem;color:var(--text-muted);margin-bottom:.3rem}
 .form-grid .field{margin-bottom:.65rem}
+.security-panel code{font-size:.78rem;word-break:break-all;background:var(--bg-primary);padding:.35rem .5rem;border-radius:4px;display:block;margin:.35rem 0 .75rem;border:1px solid var(--border)}
+.security-panel .recovery-list{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;line-height:1.6;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:.65rem .75rem;margin:.5rem 0;max-height:160px;overflow:auto}
+.activity-panel{max-height:420px;overflow:auto}
+.activity-panel table{width:100%;border-collapse:collapse;font-size:.78rem}
+.activity-panel th,.activity-panel td{text-align:left;padding:.4rem .35rem;border-bottom:1px solid var(--border);vertical-align:top}
+.activity-panel th{color:var(--text-muted);font-weight:500;position:sticky;top:0;background:var(--bg-secondary)}
+.activity-panel td.path{word-break:break-all;color:var(--text-secondary)}
+.activity-panel .empty{color:var(--text-muted);padding:.75rem 0;font-size:.85rem}
 
 .share-options{display:flex;flex-direction:column;gap:.5rem;margin:.25rem 0 1rem}
 .share-options label{display:flex;align-items:center;gap:.55rem;padding:.55rem .7rem;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:.82rem;color:var(--text-secondary);transition:all .15s}
@@ -286,6 +300,10 @@ body.trash-view #toolbarZip{display:none !important}
 <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
 <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
 <symbol id="i-arrow-right-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-files" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-3a2 2 0 0 1-2-2V2"/><path d="M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z"/><path d="M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+<symbol id="i-scroll" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></symbol>
 <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></symbol>
 <symbol id="i-undo-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
 <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
@@ -306,6 +324,8 @@ body.trash-view #toolbarZip{display:none !important}
     <button type="button" class="linkish" id="btnChangePassword"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg> Password</button>
     {{end}}
     {{if .Admin}}
+    <button type="button" class="linkish" id="btnSecurityNav"><svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg> 2FA</button>
+    <button type="button" class="linkish" id="btnActivityNav"><svg class="icon" aria-hidden="true"><use href="#i-scroll"></use></svg> Activity</button>
     <button type="button" class="linkish" id="btnUsersNav"><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg> Users</button>
     <button type="button" class="linkish" id="btnSharesNav"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg> Shares</button>
     <button type="button" class="linkish" id="btnTrashNav"><svg class="icon" aria-hidden="true"><use href="#i-trash-2"></use></svg> Trash</button>
@@ -331,6 +351,10 @@ body.trash-view #toolbarZip{display:none !important}
       </div>{{end}}
     </div>
     <div class="sidebar-content" id="sidebarTree"></div>
+    {{if .Admin}}<div class="sidebar-disk" id="sidebarDisk" title="Storage usage">
+      <div class="disk-label"><svg class="icon" aria-hidden="true"><use href="#i-hard-drive"></use></svg> <span id="diskText">Measuring…</span></div>
+      <div class="disk-bar"><span id="diskBarFill" style="width:0%"></span></div>
+    </div>{{end}}
   </div>
 
   <div class="main">
@@ -348,6 +372,7 @@ body.trash-view #toolbarZip{display:none !important}
       {{if .Admin}}<div class="toolbar-btns" id="toolbarBrowse">
         <button type="button" id="btnMkdir"><svg class="icon" aria-hidden="true"><use href="#i-folder-plus"></use></svg> New folder</button>
         <button type="button" class="primary" id="btnUpload"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg> Upload</button>
+        <button type="button" id="btnUploadFolder"><svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg> Upload folder</button>
       </div>
       <div class="toolbar-btns" id="toolbarTrash" style="display:none">
         <button type="button" id="btnBackFromTrash"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg> Back to files</button>
@@ -358,9 +383,10 @@ body.trash-view #toolbarZip{display:none !important}
       {{if .Admin}}
       <div class="upload-zone" id="uploadZone">
         <input type="file" id="fileInput" multiple>
+        <input type="file" id="folderInput" webkitdirectory directory multiple hidden>
         <svg class="icon" aria-hidden="true"><use href="#i-cloud-upload"></use></svg>
-        <p>Drag files here or click to upload</p>
-        <p class="hint">Multiple files · if interrupted, pick the same file again to resume (skips finished chunks)</p>
+        <p>Drag files or folders here · click to upload files</p>
+        <p class="hint">Folder structure is preserved · interrupted uploads resume if you pick the same files again</p>
       </div>
       <div class="upload-queue" id="uploadQueue"></div>
       {{end}}
@@ -746,8 +772,23 @@ function buildFileRow(item, isDir) {
     shareBtn.addEventListener('click', () => showShareModal(item.path, item.name, isDir));
     actions.appendChild(shareBtn);
 
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.title = 'Copy to folder';
+    copyBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg>';
+    copyBtn.addEventListener('click', () => showCopyModal(item.path));
+    actions.appendChild(copyBtn);
+
+    const dupBtn = document.createElement('button');
+    dupBtn.type = 'button';
+    dupBtn.title = 'Duplicate here';
+    dupBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-files"></use></svg>';
+    dupBtn.addEventListener('click', () => doDuplicate(item.path));
+    actions.appendChild(dupBtn);
+
     const moveBtn = document.createElement('button');
     moveBtn.type = 'button';
+    moveBtn.title = 'Move';
     moveBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-arrow-right-left"></use></svg>';
     moveBtn.addEventListener('click', () => showMoveModal(item.path));
     actions.appendChild(moveBtn);
@@ -925,6 +966,30 @@ async function navigate(path) {
 async function refreshTree() {
   invalidateCache();
   await navigate(currentPath);
+  if (IS_ADMIN) refreshDiskUsage();
+}
+
+async function refreshDiskUsage() {
+  const el = document.getElementById('sidebarDisk');
+  const text = document.getElementById('diskText');
+  const fill = document.getElementById('diskBarFill');
+  if (!el || !text || !fill) return;
+  try {
+    const res = await fetch('/admin/api/disk');
+    if (!res.ok) throw new Error('disk');
+    const d = await res.json();
+    const used = d.usedBytes || 0;
+    const free = d.freeBytes || 0;
+    const denom = used + free;
+    const pct = denom > 0 ? Math.min(100, Math.round((used / denom) * 100)) : 0;
+    fill.style.width = pct + '%';
+    el.classList.toggle('disk-warn', pct >= 90);
+    text.textContent = formatSize(used) + ' in archive · ' + formatSize(free) + ' free';
+    el.title = 'Archive uses ' + formatSize(used) + ' · ' + formatSize(free) +
+      ' free on volume · ' + pct + '% of (used + free)';
+  } catch {
+    text.textContent = 'Disk usage unavailable';
+  }
 }
 
 function closeModal() {
@@ -940,6 +1005,8 @@ function closeModal() {
   body.querySelector('.users-panel')?.remove();
   body.querySelector('.shares-panel')?.remove();
   body.querySelector('.password-panel')?.remove();
+  body.querySelector('.security-panel')?.remove();
+  body.querySelector('.activity-panel')?.remove();
   const input = document.getElementById('modalInput');
   input.style.display = '';
   input.type = 'text';
@@ -958,14 +1025,19 @@ if (IS_ADMIN) {
   document.getElementById('btnSidebarRefresh')?.addEventListener('click', refreshTree);
   document.getElementById('btnMkdir')?.addEventListener('click', showMkdirModal);
   document.getElementById('btnUpload')?.addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('btnUploadFolder')?.addEventListener('click', () => document.getElementById('folderInput').click());
 
   const uploadZone = document.getElementById('uploadZone');
   const fileInput = document.getElementById('fileInput');
+  const folderInput = document.getElementById('folderInput');
   const uploadQueue = document.getElementById('uploadQueue');
   const CHUNK_SIZE = 2 * 1024 * 1024;
   const CHUNK_RETRIES = 3;
 
-  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('click', e => {
+    if (e.target.closest('input')) return;
+    fileInput.click();
+  });
   uploadZone.addEventListener('dragover', e => {
     e.preventDefault();
     e.stopPropagation();
@@ -978,11 +1050,12 @@ if (IS_ADMIN) {
   uploadZone.addEventListener('dragleave', e => {
     if (!uploadZone.contains(e.relatedTarget)) uploadZone.classList.remove('dragover');
   });
-  uploadZone.addEventListener('drop', e => {
+  uploadZone.addEventListener('drop', async e => {
     e.preventDefault();
     e.stopPropagation();
     uploadZone.classList.remove('dragover');
-    if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files);
+    const entries = await collectUploadEntries(e.dataTransfer);
+    if (entries.length) uploadEntries(entries);
   });
   document.querySelector('.content-scroll')?.addEventListener('dragover', e => {
     if (e.dataTransfer?.types?.includes('Files')) {
@@ -990,19 +1063,90 @@ if (IS_ADMIN) {
       uploadZone.classList.add('dragover');
     }
   });
-  document.querySelector('.content-scroll')?.addEventListener('drop', e => {
-    if (!e.dataTransfer?.files?.length) return;
+  document.querySelector('.content-scroll')?.addEventListener('drop', async e => {
+    if (!e.dataTransfer) return;
     e.preventDefault();
     uploadZone.classList.remove('dragover');
-    uploadFiles(e.dataTransfer.files);
+    const entries = await collectUploadEntries(e.dataTransfer);
+    if (entries.length) uploadEntries(entries);
   });
-  fileInput.addEventListener('change', () => uploadFiles(fileInput.files));
+  fileInput.addEventListener('change', () => {
+    const entries = [...fileInput.files].map(f => ({ file: f, rel: f.name }));
+    fileInput.value = '';
+    uploadEntries(entries);
+  });
+  folderInput.addEventListener('change', () => {
+    const entries = [...folderInput.files].map(f => ({
+      file: f,
+      rel: (f.webkitRelativePath || f.name).replace(/\\/g, '/')
+    }));
+    folderInput.value = '';
+    uploadEntries(entries);
+  });
 
-  function resumeKey(file) {
-    return 'dingbap_upload:' + currentPath + ':' + file.name + ':' + file.size + ':' + file.lastModified;
+  async function collectUploadEntries(dt) {
+    const items = [...(dt.items || [])];
+    if (items.some(it => typeof it.webkitGetAsEntry === 'function' && it.webkitGetAsEntry())) {
+      const out = [];
+      const jobs = [];
+      for (const item of items) {
+        const entry = item.webkitGetAsEntry?.();
+        if (entry) jobs.push(walkFsEntry(entry, '', out));
+        else {
+          const f = item.getAsFile?.();
+          if (f) out.push({ file: f, rel: f.name });
+        }
+      }
+      await Promise.all(jobs);
+      return out;
+    }
+    return [...(dt.files || [])].map(f => ({
+      file: f,
+      rel: (f.webkitRelativePath || f.name).replace(/\\/g, '/')
+    }));
   }
 
-  function createUploadItem(file) {
+  function walkFsEntry(entry, prefix, out) {
+    return new Promise((resolve, reject) => {
+      if (entry.isFile) {
+        entry.file(file => {
+          const rel = prefix ? prefix + '/' + entry.name : entry.name;
+          out.push({ file, rel: rel.replace(/\\/g, '/') });
+          resolve();
+        }, reject);
+        return;
+      }
+      if (!entry.isDirectory) {
+        resolve();
+        return;
+      }
+      const dirPrefix = prefix ? prefix + '/' + entry.name : entry.name;
+      const reader = entry.createReader();
+      const readBatch = () => {
+        reader.readEntries(async batch => {
+          if (!batch.length) {
+            resolve();
+            return;
+          }
+          try {
+            for (const child of batch) {
+              await walkFsEntry(child, dirPrefix, out);
+            }
+            readBatch();
+          } catch (err) {
+            reject(err);
+          }
+        }, reject);
+      };
+      readBatch();
+    });
+  }
+
+  function resumeKey(file, rel) {
+    return 'dingbap_upload:' + currentPath + ':' + rel + ':' + file.size + ':' + file.lastModified;
+  }
+
+  function createUploadItem(label) {
     const el = document.createElement('div');
     el.className = 'upload-item';
     el.innerHTML =
@@ -1010,7 +1154,7 @@ if (IS_ADMIN) {
       '<span class="upload-item-name"></span>' +
       '<span class="upload-item-meta">0%</span>' +
       '</div><div class="upload-item-bar"><span></span></div>';
-    el.querySelector('.upload-item-name').textContent = file.name;
+    el.querySelector('.upload-item-name').textContent = label;
     uploadQueue.appendChild(el);
     return el;
   }
@@ -1040,41 +1184,46 @@ if (IS_ADMIN) {
     return eta ? pct + '% · ' + eta : pct + '%';
   }
 
-  async function uploadFiles(files) {
-    const list = [...files];
-    fileInput.value = '';
-    for (const file of list) {
-      await uploadOneFile(file);
+  async function uploadEntries(entries) {
+    entries.sort((a, b) => a.rel.localeCompare(b.rel));
+    for (const entry of entries) {
+      await uploadOneFile(entry.file, entry.rel);
     }
     await refreshTree();
   }
 
-  async function uploadOneFile(file) {
-    const item = createUploadItem(file);
+  async function uploadOneFile(file, relPath) {
+    const rel = (relPath || file.name).replace(/\\/g, '/').replace(/^\/+/, '');
+    if (!rel || rel.includes('..') || rel.split('/').some(p => !p || p.startsWith('.'))) {
+      toast('Skipped invalid path: ' + (relPath || file.name), false);
+      return;
+    }
+    const item = createUploadItem(rel);
     const started = performance.now();
     let uploadedBytes = 0;
 
     try {
-      let uploadId = localStorage.getItem(resumeKey(file)) || '';
+      let uploadId = localStorage.getItem(resumeKey(file, rel)) || '';
       let chunkSize = CHUNK_SIZE;
       let totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE) || 1);
       let received = new Set();
+      const baseName = rel.split('/').pop();
 
       if (uploadId) {
         const st = await fetch('/admin/upload/status?id=' + encodeURIComponent(uploadId));
         if (st.ok) {
           const data = await st.json();
-          if (data.ok && data.name === file.name && data.size === file.size) {
+          if (data.ok && data.name === baseName && data.size === file.size) {
             chunkSize = data.chunkSize;
             totalChunks = data.totalChunks;
             (data.received || []).forEach(i => received.add(i));
           } else {
             uploadId = '';
-            localStorage.removeItem(resumeKey(file));
+            localStorage.removeItem(resumeKey(file, rel));
           }
         } else {
           uploadId = '';
-          localStorage.removeItem(resumeKey(file));
+          localStorage.removeItem(resumeKey(file, rel));
         }
       }
 
@@ -1084,7 +1233,7 @@ if (IS_ADMIN) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             path: currentPath,
-            name: file.name,
+            name: rel,
             size: file.size,
             chunkSize: CHUNK_SIZE
           })
@@ -1094,7 +1243,7 @@ if (IS_ADMIN) {
         uploadId = initData.uploadId;
         chunkSize = initData.chunkSize;
         totalChunks = initData.totalChunks;
-        localStorage.setItem(resumeKey(file), uploadId);
+        localStorage.setItem(resumeKey(file, rel), uploadId);
       }
 
       for (let index = 0; index < totalChunks; index++) {
@@ -1150,7 +1299,7 @@ if (IS_ADMIN) {
       const doneData = await doneRes.json();
       if (!doneData.ok) throw new Error(doneData.error || 'Could not finish upload');
 
-      localStorage.removeItem(resumeKey(file));
+      localStorage.removeItem(resumeKey(file, rel));
       item.classList.add('done');
       setUploadProgress(item, 1, 'Done');
       toast(doneData.message || 'Uploaded', true);
@@ -1304,10 +1453,56 @@ if (IS_ADMIN) {
     await refreshTree();
   }
 
+  async function showCopyModal(path) {
+    await ensureListing('');
+    const dirs = collectCachedDirs();
+    document.getElementById('modalTitle').textContent = 'Copy to folder';
+    document.getElementById('modalHint').style.display = 'none';
+    const input = document.getElementById('modalInput');
+    input.style.display = 'none';
+    document.getElementById('modalOk').style.display = 'none';
+    document.getElementById('modalBody').querySelector('.dirpick')?.remove();
+
+    const pick = document.createElement('div');
+    pick.className = 'dirpick';
+    for (const d of dirs) {
+      // Cannot copy a folder into itself or a descendant.
+      if (path && (d === path || d.startsWith(path + '/'))) continue;
+      const item = document.createElement('div');
+      item.className = 'dirpick-item';
+      item.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>';
+      const label = document.createElement('span');
+      label.textContent = d || '/ (root)';
+      item.appendChild(label);
+      item.addEventListener('click', () => doCopy(path, d));
+      pick.appendChild(item);
+    }
+    if (!pick.children.length) {
+      toast('No folders to copy into', false);
+      return;
+    }
+    document.getElementById('modalBody').appendChild(pick);
+    document.getElementById('modalOverlay').classList.add('active');
+  }
+
+  async function doCopy(path, destDir) {
+    const data = await api('/admin/copy', { path, destDir });
+    toast(data.message || data.error, data.ok);
+    closeModal();
+    await refreshTree();
+  }
+
+  async function doDuplicate(path) {
+    const data = await api('/admin/duplicate', { path });
+    toast(data.message || data.error, data.ok);
+    if (data.ok) await refreshTree();
+  }
+
   // expose for clarity (used only internally now)
   window.showMkdirModal = showMkdirModal;
   window.showRenameModal = showRenameModal;
   window.showMoveModal = showMoveModal;
+  window.showCopyModal = showCopyModal;
   window.confirmDelete = confirmDelete;
 
   async function enterTrashView() {
@@ -1439,7 +1634,7 @@ if (IS_ADMIN) {
     document.getElementById('modalTitle').textContent = 'Share: ' + name;
     document.getElementById('modalHint').style.display = 'block';
     document.getElementById('modalHint').textContent = isDir
-      ? 'Anyone with the link can browse and download this folder.'
+      ? 'Create a download link, or a drop box for inbound uploads (upload-only; guests cannot browse the folder).'
       : 'Anyone with the link can download this file.';
     const input = document.getElementById('modalInput');
     input.style.display = 'none';
@@ -1451,14 +1646,39 @@ if (IS_ADMIN) {
 
     const opts = document.createElement('div');
     opts.className = 'share-options';
+    let kindHtml = '';
+    if (isDir) {
+      kindHtml =
+        '<label><input type="radio" name="shareKind" value="link" checked> Download link (browse + ZIP)</label>' +
+        '<label><input type="radio" name="shareKind" value="drop"> Drop box (upload only · guests cannot see existing files)</label>';
+    }
     let expiryHtml =
       '<label><input type="radio" name="shareExpiry" value="24h" checked> Expires in 24 hours</label>' +
       '<label><input type="radio" name="shareExpiry" value="7d"> Expires in 7 days</label>' +
       '<label><input type="radio" name="shareExpiry" value="30d"> Expires in 30 days</label>' +
-      '<label><input type="radio" name="shareExpiry" value="never"> Never expires</label>' +
-      '<label><input type="radio" name="shareExpiry" value="1download"> Valid for 1 download</label>';
-    opts.innerHTML = expiryHtml;
+      '<label class="share-link-only"><input type="radio" name="shareExpiry" value="never"> Never expires</label>' +
+      '<label class="share-link-only"><input type="radio" name="shareExpiry" value="1download"> Valid for 1 download</label>';
+    opts.innerHTML = kindHtml + expiryHtml;
     body.appendChild(opts);
+
+    function syncExpiryForKind() {
+      const kind = document.querySelector('input[name="shareKind"]:checked')?.value || 'link';
+      const isDrop = kind === 'drop';
+      opts.querySelectorAll('.share-link-only').forEach(el => {
+        el.style.display = isDrop ? 'none' : '';
+      });
+      if (isDrop) {
+        const never = opts.querySelector('input[value="never"]');
+        const once = opts.querySelector('input[value="1download"]');
+        if (never?.checked || once?.checked) {
+          opts.querySelector('input[value="24h"]').checked = true;
+        }
+      }
+    }
+    opts.querySelectorAll('input[name="shareKind"]').forEach(el => {
+      el.addEventListener('change', syncExpiryForKind);
+    });
+    syncExpiryForKind();
 
     const pass = document.createElement('div');
     pass.className = 'share-pass';
@@ -1482,9 +1702,10 @@ if (IS_ADMIN) {
     ok.onclick = async () => {
       const selected = document.querySelector('input[name="shareExpiry"]:checked');
       const expires = selected ? selected.value : '24h';
+      const kind = document.querySelector('input[name="shareKind"]:checked')?.value || 'link';
       const password = document.getElementById('sharePasswordInput')?.value || '';
       try {
-        const data = await api('/admin/share', { path, expires, password });
+        const data = await api('/admin/share', { path, expires, password, kind });
         if (!data.ok) {
           toast(data.error || 'Could not create link', false);
           return;
@@ -1504,7 +1725,7 @@ if (IS_ADMIN) {
             toast('Select and copy the link', true);
           }
         };
-        toast('Share link created', true);
+        toast(kind === 'drop' ? 'Drop link created' : 'Share link created', true);
       } catch (_) {
         toast('Could not create link', false);
       }
@@ -1668,6 +1889,151 @@ function showChangePasswordModal() {
   document.getElementById('modalOverlay').classList.add('active');
 }
 
+async function showSecurityModal() {
+  closeModal();
+  document.getElementById('modalTitle').textContent = 'Two-factor authentication';
+  document.getElementById('modalHint').style.display = 'block';
+  document.getElementById('modalHint').textContent =
+    'Optional for admins. Secrets stay on this server — no Google/Microsoft login.';
+  document.getElementById('modalInput').style.display = 'none';
+  document.getElementById('modalBox')?.classList.add('wide');
+  const body = document.getElementById('modalBody');
+  const panel = document.createElement('div');
+  panel.className = 'security-panel form-grid';
+  body.appendChild(panel);
+  const ok = document.getElementById('modalOk');
+  ok.style.display = 'none';
+
+  async function render() {
+    panel.innerHTML = '<p class="hint">Loading…</p>';
+    let st;
+    try {
+      const res = await fetch('/api/totp/status');
+      st = await res.json();
+    } catch (_) {
+      panel.innerHTML = '<p class="hint">Could not load 2FA status</p>';
+      return;
+    }
+    if (!st.admin) {
+      panel.innerHTML = '<p class="hint">Two-factor authentication is only available for admin accounts.</p>';
+      return;
+    }
+    if (st.enabled) {
+      panel.innerHTML =
+        '<p>2FA is <strong>enabled</strong> for your admin account.</p>' +
+        '<div class="field"><label>Password</label><input type="password" id="totpDisPw" autocomplete="current-password"></div>' +
+        '<div class="field"><label>Authenticator or recovery code</label><input type="text" id="totpDisCode" autocomplete="one-time-code"></div>';
+      ok.style.display = '';
+      ok.className = 'danger';
+      ok.textContent = 'Disable 2FA';
+      ok.onclick = async () => {
+        try {
+          const data = await api('/api/totp/disable', {
+            password: document.getElementById('totpDisPw').value,
+            code: document.getElementById('totpDisCode').value.trim()
+          });
+          toast(data.message || data.error, data.ok);
+          if (data.ok) { closeModal(); }
+        } catch (_) {
+          toast('Could not disable 2FA', false);
+        }
+      };
+      return;
+    }
+    panel.innerHTML =
+      '<p>2FA is off. Enable it to require an authenticator app code after your password.</p>';
+    ok.style.display = '';
+    ok.className = 'ok';
+    ok.textContent = 'Set up 2FA';
+    ok.onclick = startTotpSetup;
+  }
+
+  async function startTotpSetup() {
+    try {
+      const data = await api('/api/totp/begin', {});
+      if (!data.ok) {
+        toast(data.error || 'Could not start setup', false);
+        return;
+      }
+      panel.innerHTML =
+        '<p>Add this account in your authenticator app (Aegis, FreeOTP, etc.), then enter a code to confirm.</p>' +
+        '<label>Secret (manual entry)</label><code id="totpSecret"></code>' +
+        '<label>otpauth URI</label><code id="totpUri"></code>' +
+        '<div class="field"><label>Code from app</label><input type="text" id="totpConfirmCode" inputmode="numeric" autocomplete="one-time-code"></div>';
+      document.getElementById('totpSecret').textContent = data.secret || '';
+      document.getElementById('totpUri').textContent = data.uri || '';
+      ok.textContent = 'Confirm & enable';
+      ok.onclick = async () => {
+        try {
+          const conf = await api('/api/totp/confirm', {
+            code: document.getElementById('totpConfirmCode').value.trim()
+          });
+          if (!conf.ok) {
+            toast(conf.error || 'Invalid code', false);
+            return;
+          }
+          const codes = (conf.recovery_codes || []).join('\n');
+          panel.innerHTML =
+            '<p><strong>2FA enabled.</strong> Save these recovery codes offline — they are shown once.</p>' +
+            '<div class="recovery-list" id="totpRecovery"></div>';
+          document.getElementById('totpRecovery').textContent = codes;
+          ok.textContent = 'Done';
+          ok.onclick = () => closeModal();
+        } catch (_) {
+          toast('Could not confirm 2FA', false);
+        }
+      };
+    } catch (_) {
+      toast('Could not start 2FA setup', false);
+    }
+  }
+
+  document.getElementById('modalOverlay').classList.add('active');
+  await render();
+}
+
+async function showActivityModal() {
+  closeModal();
+  document.getElementById('modalTitle').textContent = 'Activity log';
+  document.getElementById('modalHint').style.display = 'block';
+  document.getElementById('modalHint').textContent =
+    'Local JSONL under .dingbap/. Off unless ACTIVITY_LOG=1. IPs only with ACTIVITY_LOG_IP=1.';
+  document.getElementById('modalInput').style.display = 'none';
+  document.getElementById('modalBox')?.classList.add('wide');
+  const body = document.getElementById('modalBody');
+  const panel = document.createElement('div');
+  panel.className = 'activity-panel';
+  panel.innerHTML = '<p class="empty">Loading…</p>';
+  body.appendChild(panel);
+  document.getElementById('modalOk').style.display = 'none';
+  document.getElementById('modalOverlay').classList.add('active');
+  try {
+    const res = await fetch('/admin/api/activity');
+    const data = await res.json();
+    if (!data.enabled) {
+      panel.innerHTML = '<p class="empty">' + (data.message || 'Activity log is disabled.') + '</p>';
+      return;
+    }
+    const entries = data.entries || [];
+    if (!entries.length) {
+      panel.innerHTML = '<p class="empty">No events yet.</p>';
+      return;
+    }
+    const showIP = !!data.logIP;
+    let html = '<table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Path</th>' +
+      (showIP ? '<th>IP</th>' : '') + '</tr></thead><tbody>';
+    for (const e of entries) {
+      html += '<tr><td>' + escapeHtml(e.ts || '') + '</td><td>' + escapeHtml(e.user || '') +
+        '</td><td>' + escapeHtml(e.action || '') + '</td><td class="path">' + escapeHtml(e.path || '') +
+        '</td>' + (showIP ? '<td>' + escapeHtml(e.ip || '') + '</td>' : '') + '</tr>';
+    }
+    html += '</tbody></table>';
+    panel.innerHTML = html;
+  } catch (_) {
+    panel.innerHTML = '<p class="empty">Could not load activity log.</p>';
+  }
+}
+
 async function showUsersModal() {
   closeModal();
   document.getElementById('modalTitle').textContent = 'Users';
@@ -1813,7 +2179,8 @@ async function renderSharesList() {
       row.className = 's-row';
       const name = document.createElement('span');
       name.className = 's-name';
-      name.textContent = s.name + (s.is_dir ? ' (folder)' : '') + (s.has_password ? ' · locked' : '') + ' · ' + s.path;
+      name.textContent = s.name + (s.kind === 'drop' ? ' (drop)' : (s.is_dir ? ' (folder)' : '')) +
+        (s.has_password ? ' · locked' : '') + ' · ' + s.path;
       name.title = location.origin + '/s/' + s.token;
       const actions = document.createElement('span');
       actions.className = 's-actions';
@@ -1851,6 +2218,8 @@ async function renderSharesList() {
 }
 
 document.getElementById('btnChangePassword')?.addEventListener('click', showChangePasswordModal);
+document.getElementById('btnSecurityNav')?.addEventListener('click', showSecurityModal);
+document.getElementById('btnActivityNav')?.addEventListener('click', showActivityModal);
 document.getElementById('btnUsersNav')?.addEventListener('click', showUsersModal);
 document.getElementById('btnSharesNav')?.addEventListener('click', showSharesModal);
 

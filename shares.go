@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -24,6 +25,9 @@ const (
 	shareTokenBytes      = 32
 	shareUnlockTTL       = 12 * time.Hour
 	shareCookiePrefix    = "dingbap_su_"
+	shareKindLink        = "link"
+	shareKindDrop        = "drop"
+	dropDefaultMaxUploads = 50
 )
 
 type Share struct {
@@ -31,10 +35,13 @@ type Share struct {
 	Path          string     `json:"path"` // relative to storage root
 	Name          string     `json:"name"`
 	IsDir         bool       `json:"is_dir"`
+	Kind          string     `json:"kind,omitempty"` // ""/"link" = download share; "drop" = inbound upload
 	CreatedAt     time.Time  `json:"created_at"`
 	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
 	MaxDownloads  int        `json:"max_downloads,omitempty"` // 0 = unlimited (until expiry)
 	DownloadCount int        `json:"download_count"`
+	MaxUploads    int        `json:"max_uploads,omitempty"` // drop shares; 0 = unlimited until expiry
+	UploadCount   int        `json:"upload_count,omitempty"`
 	CreatedBy     string     `json:"created_by,omitempty"`
 	PasswordHash  string     `json:"password_hash,omitempty"`
 }
@@ -51,6 +58,7 @@ type sharePageData struct {
 	Token       string
 	Name        string
 	IsDir       bool
+	IsDrop      bool
 	NeedPass    bool
 	NotFound    bool
 	Error       string
@@ -60,6 +68,8 @@ type sharePageData struct {
 	Entries     []shareEntry
 	DownloadURL string
 	Size        string
+	MaxSizeMB   int64
+	Message     string
 }
 
 type shareEntry struct {
@@ -97,17 +107,21 @@ func (s *shareStore) saveLocked() error {
 	if err != nil {
 		return err
 	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	return writeFileAtomic(s.path, data, 0600)
 }
 
-func (s *shareStore) create(relPath, createdBy, mode, password string) (*Share, error) {
+func (s *shareStore) create(relPath, createdBy, mode, password, kind string) (*Share, error) {
 	relPath = strings.Trim(relPath, "/")
 	if relPath == "" {
 		return nil, fmt.Errorf("cannot share the storage root")
+	}
+
+	kind = strings.TrimSpace(strings.ToLower(kind))
+	if kind == "" {
+		kind = shareKindLink
+	}
+	if kind != shareKindLink && kind != shareKindDrop {
+		return nil, fmt.Errorf("invalid share kind")
 	}
 
 	abs, err := safePath(relPath)
@@ -117,6 +131,9 @@ func (s *shareStore) create(relPath, createdBy, mode, password string) (*Share, 
 	info, err := os.Stat(abs)
 	if err != nil {
 		return nil, fmt.Errorf("path not found")
+	}
+	if kind == shareKindDrop && !info.IsDir() {
+		return nil, fmt.Errorf("drop shares require a folder")
 	}
 
 	token, err := randomToken(shareTokenBytes)
@@ -130,6 +147,7 @@ func (s *shareStore) create(relPath, createdBy, mode, password string) (*Share, 
 		Path:      relPath,
 		Name:      filepath.Base(relPath),
 		IsDir:     info.IsDir(),
+		Kind:      kind,
 		CreatedAt: now,
 		CreatedBy: createdBy,
 	}
@@ -146,22 +164,40 @@ func (s *shareStore) create(relPath, createdBy, mode, password string) (*Share, 
 		sh.PasswordHash = hash
 	}
 
-	switch mode {
-	case shareExpiry24h:
-		exp := now.Add(24 * time.Hour)
-		sh.ExpiresAt = &exp
-	case shareExpiry7d:
-		exp := now.Add(7 * 24 * time.Hour)
-		sh.ExpiresAt = &exp
-	case shareExpiry30d:
-		exp := now.Add(30 * 24 * time.Hour)
-		sh.ExpiresAt = &exp
-	case shareExpiryNever:
-		// no expiry
-	case shareExpiry1Download:
-		sh.MaxDownloads = 1
-	default:
-		return nil, fmt.Errorf("invalid expiry option")
+	if kind == shareKindDrop {
+		// Drops always expire (no "never") and use an upload quota — keeps the door small.
+		switch mode {
+		case shareExpiry24h:
+			exp := now.Add(24 * time.Hour)
+			sh.ExpiresAt = &exp
+		case shareExpiry7d:
+			exp := now.Add(7 * 24 * time.Hour)
+			sh.ExpiresAt = &exp
+		case shareExpiry30d:
+			exp := now.Add(30 * 24 * time.Hour)
+			sh.ExpiresAt = &exp
+		default:
+			return nil, fmt.Errorf("drop shares require expiry (24h, 7d, or 30d)")
+		}
+		sh.MaxUploads = dropDefaultMaxUploads
+	} else {
+		switch mode {
+		case shareExpiry24h:
+			exp := now.Add(24 * time.Hour)
+			sh.ExpiresAt = &exp
+		case shareExpiry7d:
+			exp := now.Add(7 * 24 * time.Hour)
+			sh.ExpiresAt = &exp
+		case shareExpiry30d:
+			exp := now.Add(30 * 24 * time.Hour)
+			sh.ExpiresAt = &exp
+		case shareExpiryNever:
+			// no expiry
+		case shareExpiry1Download:
+			sh.MaxDownloads = 1
+		default:
+			return nil, fmt.Errorf("invalid expiry option")
+		}
 	}
 
 	s.mu.Lock()
@@ -187,10 +223,13 @@ func (s *shareStore) listPublic() []map[string]any {
 			"path":           sh.Path,
 			"name":           sh.Name,
 			"is_dir":         sh.IsDir,
+			"kind":           shareKindOrLink(&sh),
 			"created_at":     sh.CreatedAt,
 			"expires_at":     sh.ExpiresAt,
 			"max_downloads":  sh.MaxDownloads,
 			"download_count": sh.DownloadCount,
+			"max_uploads":    sh.MaxUploads,
+			"upload_count":   sh.UploadCount,
 			"created_by":     sh.CreatedBy,
 			"has_password":   sh.PasswordHash != "",
 		})
@@ -221,20 +260,48 @@ func (s *shareStore) getValid(token string) (*Share, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func (s *shareStore) recordDownload(token string) error {
+// beginDownload reserves one download against MaxDownloads (if set) before
+// the file/zip transfer starts. This closes the parallel-click race where
+// many GETs could all pass getValid before any counter increment.
+// Unlimited shares (MaxDownloads == 0) still bump DownloadCount for stats.
+func (s *shareStore) beginDownload(token string) error {
+	if !validShareToken(token) {
+		return fmt.Errorf("not found")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.pruneLocked(time.Now().UTC())
 	for i := range s.Shares {
 		if s.Shares[i].Token != token {
 			continue
 		}
-		s.Shares[i].DownloadCount++
-		if s.Shares[i].MaxDownloads > 0 && s.Shares[i].DownloadCount >= s.Shares[i].MaxDownloads {
-			s.removeIndexLocked(i)
+		sh := &s.Shares[i]
+		if shareIsDrop(sh) {
+			return fmt.Errorf("not a download share")
 		}
-		return s.saveLocked()
+		if shareExpired(sh, time.Now().UTC()) {
+			s.removeIndexLocked(i)
+			_ = s.saveLocked()
+			return fmt.Errorf("expired")
+		}
+		if sh.MaxDownloads > 0 && sh.DownloadCount >= sh.MaxDownloads {
+			s.removeIndexLocked(i)
+			_ = s.saveLocked()
+			return fmt.Errorf("expired")
+		}
+		sh.DownloadCount++
+		hitLimit := sh.MaxDownloads > 0 && sh.DownloadCount >= sh.MaxDownloads
+		if err := s.saveLocked(); err != nil {
+			sh.DownloadCount-- // best-effort rollback on disk failure
+			return err
+		}
+		if hitLimit {
+			s.removeIndexLocked(i)
+			_ = s.saveLocked()
+		}
+		return nil
 	}
-	return nil
+	return fmt.Errorf("not found")
 }
 
 func (s *shareStore) revoke(token string) bool {
@@ -305,11 +372,75 @@ func (s *shareStore) pruneLocked(now time.Time) {
 	s.Shares = filtered
 }
 
+func shareKindOrLink(sh *Share) string {
+	if sh != nil && sh.Kind == shareKindDrop {
+		return shareKindDrop
+	}
+	return shareKindLink
+}
+
+func shareIsDrop(sh *Share) bool {
+	return shareKindOrLink(sh) == shareKindDrop
+}
+
+// beginUpload reserves one upload slot for a drop share before writing bytes.
+func (s *shareStore) beginUpload(token string) error {
+	if !validShareToken(token) {
+		return fmt.Errorf("not found")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pruneLocked(time.Now().UTC())
+	for i := range s.Shares {
+		if s.Shares[i].Token != token {
+			continue
+		}
+		sh := &s.Shares[i]
+		if !shareIsDrop(sh) {
+			return fmt.Errorf("not a drop share")
+		}
+		if shareExpired(sh, time.Now().UTC()) {
+			s.removeIndexLocked(i)
+			_ = s.saveLocked()
+			return fmt.Errorf("expired")
+		}
+		if sh.MaxUploads > 0 && sh.UploadCount >= sh.MaxUploads {
+			s.removeIndexLocked(i)
+			_ = s.saveLocked()
+			return fmt.Errorf("expired")
+		}
+		sh.UploadCount++
+		return s.saveLocked()
+	}
+	return fmt.Errorf("not found")
+}
+
+func (s *shareStore) undoUpload(token string) {
+	if !validShareToken(token) {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.Shares {
+		if s.Shares[i].Token != token {
+			continue
+		}
+		if s.Shares[i].UploadCount > 0 {
+			s.Shares[i].UploadCount--
+			_ = s.saveLocked()
+		}
+		return
+	}
+}
+
 func shareExpired(sh *Share, now time.Time) bool {
 	if sh.ExpiresAt != nil && !sh.ExpiresAt.IsZero() && now.After(*sh.ExpiresAt) {
 		return true
 	}
 	if sh.MaxDownloads > 0 && sh.DownloadCount >= sh.MaxDownloads {
+		return true
+	}
+	if shareIsDrop(sh) && sh.MaxUploads > 0 && sh.UploadCount >= sh.MaxUploads {
 		return true
 	}
 	return false
@@ -394,16 +525,16 @@ func handleCreateShare(w http.ResponseWriter, r *http.Request) {
 		Path     string `json:"path"`
 		Expires  string `json:"expires"` // 24h | 7d | 30d | never | 1download
 		Password string `json:"password"`
+		Kind     string `json:"kind"` // link (default) | drop
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	createdBy := ""
 	if s := sessionFromCtx(r); s != nil {
 		createdBy = s.Username
 	}
-	sh, err := shares.create(body.Path, createdBy, body.Expires, body.Password)
+	sh, err := shares.create(body.Path, createdBy, body.Expires, body.Password, body.Kind)
 	if err != nil {
 		jsonErr(w, http.StatusBadRequest, err.Error())
 		return
@@ -417,12 +548,15 @@ func handleCreateShare(w http.ResponseWriter, r *http.Request) {
 		"url":           urlPath,
 		"name":          sh.Name,
 		"is_dir":        sh.IsDir,
+		"kind":          shareKindOrLink(sh),
 		"expires":       body.Expires,
 		"expires_at":    sh.ExpiresAt,
 		"max_downloads": sh.MaxDownloads,
+		"max_uploads":   sh.MaxUploads,
 		"has_password":  body.Password != "",
 		"message":       "Share link created",
 	})
+	auditLog(actorName(r), "share_create", sh.Path, r)
 }
 
 func handleListShares(w http.ResponseWriter, r *http.Request) {
@@ -444,8 +578,7 @@ func handleRevokeShare(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Token string `json:"token"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if !shares.revoke(body.Token) {
@@ -453,6 +586,7 @@ func handleRevokeShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, "Share revoked")
+	auditLog(actorName(r), "share_revoke", body.Token, r)
 }
 
 func handlePublicShare(w http.ResponseWriter, r *http.Request) {
@@ -483,7 +617,24 @@ func handlePublicShare(w http.ResponseWriter, r *http.Request) {
 			Token:    sh.Token,
 			Name:     sh.Name,
 			IsDir:    sh.IsDir,
+			IsDrop:   shareIsDrop(sh),
 			NeedPass: true,
+		})
+	case shareIsDrop(sh):
+		if sub == "upload" && r.Method == http.MethodPost {
+			handleDropUpload(w, r, sh)
+			return
+		}
+		if sub != "" {
+			renderShareGone(w)
+			return
+		}
+		renderSharePage(w, http.StatusOK, sharePageData{
+			Token:     sh.Token,
+			Name:      sh.Name,
+			IsDir:     true,
+			IsDrop:    true,
+			MaxSizeMB: maxUploadBytes >> 20,
 		})
 	case sub == "download":
 		serveShareDownload(w, r, sh)
@@ -517,6 +668,7 @@ func handleShareUnlock(w http.ResponseWriter, r *http.Request, sh *Share) {
 			Token:    sh.Token,
 			Name:     sh.Name,
 			IsDir:    sh.IsDir,
+			IsDrop:   shareIsDrop(sh),
 			NeedPass: true,
 			Error:    "Incorrect password",
 		})
@@ -524,6 +676,103 @@ func handleShareUnlock(w http.ResponseWriter, r *http.Request, sh *Share) {
 	}
 	setShareUnlockCookie(w, r, sh)
 	http.Redirect(w, r, "/s/"+sh.Token, http.StatusSeeOther)
+}
+
+func handleDropUpload(w http.ResponseWriter, r *http.Request, sh *Share) {
+	if !shareIsDrop(sh) {
+		renderShareGone(w)
+		return
+	}
+	wantJSON := strings.Contains(r.Header.Get("Accept"), "application/json")
+	respond := func(status int, msg, errMsg string) {
+		if wantJSON {
+			if errMsg != "" {
+				writeJSON(w, status, map[string]any{"ok": false, "error": errMsg})
+				return
+			}
+			writeJSON(w, status, map[string]any{"ok": true, "message": msg})
+			return
+		}
+		if status == http.StatusGone || status == http.StatusNotFound {
+			renderSharePage(w, status, sharePageData{NotFound: true, Error: errMsg})
+			return
+		}
+		data := sharePageData{
+			Token:     sh.Token,
+			Name:      sh.Name,
+			IsDir:     true,
+			IsDrop:    true,
+			MaxSizeMB: maxUploadBytes >> 20,
+			Message:   msg,
+			Error:     errMsg,
+		}
+		renderSharePage(w, status, data)
+	}
+
+	if err := r.ParseMultipartForm(maxUploadBytes + (1 << 20)); err != nil {
+		respond(http.StatusBadRequest, "", "Could not read upload")
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		respond(http.StatusBadRequest, "", "No file provided")
+		return
+	}
+	defer file.Close()
+
+	name := sanitizeName(header.Filename)
+	if name == "" {
+		respond(http.StatusBadRequest, "", "Invalid filename")
+		return
+	}
+
+	dirAbs, err := safePath(sh.Path)
+	if err != nil {
+		if wantJSON {
+			writeJSON(w, http.StatusGone, map[string]any{"ok": false, "error": "Drop folder is no longer available."})
+			return
+		}
+		renderShareGone(w)
+		return
+	}
+	info, err := os.Stat(dirAbs)
+	if err != nil || !info.IsDir() {
+		respond(http.StatusNotFound, "", "Drop folder is no longer available.")
+		return
+	}
+
+	if err := shares.beginUpload(sh.Token); err != nil {
+		respond(http.StatusGone, "", "This drop link has expired or reached its upload limit.")
+		return
+	}
+
+	name = uniqueCopyName(dirAbs, name)
+	dest := filepath.Join(dirAbs, name)
+	dst, err := os.OpenFile(dest, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		shares.undoUpload(sh.Token)
+		respond(http.StatusInternalServerError, "", "Failed to create file")
+		return
+	}
+
+	written, copyErr := io.Copy(dst, io.LimitReader(file, maxUploadBytes+1))
+	closeErr := dst.Close()
+	if copyErr != nil || closeErr != nil {
+		_ = os.Remove(dest)
+		shares.undoUpload(sh.Token)
+		respond(http.StatusInternalServerError, "", "Failed to write file")
+		return
+	}
+	if written > maxUploadBytes {
+		_ = os.Remove(dest)
+		shares.undoUpload(sh.Token)
+		respond(http.StatusRequestEntityTooLarge, "", fmt.Sprintf("File too large (max %d MB)", maxUploadBytes>>20))
+		return
+	}
+
+	invalidateListingCache()
+	auditLog("drop:"+sh.Token[:8], "drop_upload", pathJoin(sh.Path, name), r)
+	respond(http.StatusOK, fmt.Sprintf("Uploaded %s", name), "")
 }
 
 func serveShareContent(w http.ResponseWriter, r *http.Request, sh *Share, relInside string) {
@@ -581,10 +830,7 @@ func serveShareContent(w http.ResponseWriter, r *http.Request, sh *Share, relIns
 			})
 			return
 		}
-		serveStoredFile(w, r, target, true)
-		if err := shares.recordDownload(sh.Token); err != nil {
-			log.Printf("share download record: %v", err)
-		}
+		reserveAndServeShareFile(w, r, sh, target)
 		return
 	}
 
@@ -648,10 +894,7 @@ func serveShareDownload(w http.ResponseWriter, r *http.Request, sh *Share) {
 		renderShareGone(w)
 		return
 	}
-	serveStoredFile(w, r, target, true)
-	if err := shares.recordDownload(sh.Token); err != nil {
-		log.Printf("share download record: %v", err)
-	}
+	reserveAndServeShareFile(w, r, sh, target)
 }
 
 func serveShareFile(w http.ResponseWriter, r *http.Request, sh *Share, relInside string) {
@@ -685,10 +928,7 @@ func serveShareFile(w http.ResponseWriter, r *http.Request, sh *Share, relInside
 		renderShareGone(w)
 		return
 	}
-	serveStoredFile(w, r, target, true)
-	if err := shares.recordDownload(sh.Token); err != nil {
-		log.Printf("share download record: %v", err)
-	}
+	reserveAndServeShareFile(w, r, sh, target)
 }
 
 func serveShareZip(w http.ResponseWriter, r *http.Request, sh *Share) {
@@ -696,14 +936,24 @@ func serveShareZip(w http.ResponseWriter, r *http.Request, sh *Share) {
 		renderSharePage(w, http.StatusMethodNotAllowed, sharePageData{NotFound: true})
 		return
 	}
+	if err := shares.beginDownload(sh.Token); err != nil {
+		renderShareGone(w)
+		return
+	}
 	name := sh.Name + ".zip"
 	if err := streamZip(w, name, []string{sh.Path}); err != nil {
 		log.Printf("share zip: %v", err)
 		return
 	}
-	if err := shares.recordDownload(sh.Token); err != nil {
-		log.Printf("share download record: %v", err)
+}
+
+// reserveAndServeShareFile deducts download quota before transferring bytes.
+func reserveAndServeShareFile(w http.ResponseWriter, r *http.Request, sh *Share, target string) {
+	if err := shares.beginDownload(sh.Token); err != nil {
+		renderShareGone(w)
+		return
 	}
+	serveStoredFile(w, r, target, true)
 }
 
 func renderShareGone(w http.ResponseWriter) {
@@ -713,7 +963,10 @@ func renderShareGone(w http.ResponseWriter) {
 func renderSharePage(w http.ResponseWriter, status int, data sharePageData) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'")
+	// Drop uploads need inline JS + XHR; keep everything else locked down.
+	w.Header().Set("Content-Security-Policy",
+		"default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; "+
+			"script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'")
 	if status == 0 {
 		status = http.StatusOK
 	}

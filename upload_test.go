@@ -58,14 +58,69 @@ func TestChunkedUploadAssemble(t *testing.T) {
 func TestChunkedUploadRejectsBadDest(t *testing.T) {
 	storage := t.TempDir()
 	rootDir = storage
+	_ = configureStorageRoot(storage)
 	um, err := newUploadManager(filepath.Join(storage, ".dingbap"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// sanitizeName strips path from filename; destination path must still be safe.
-	_, _, err = um.init("../../etc", "evil.txt", 10, 1024, "admin")
+	// Dot-prefixed destinations are rejected by safePath.
+	_, _, err = um.init(".dingbap", "evil.txt", 10, 1024, "admin")
 	if err == nil {
 		t.Fatal("expected invalid destination path")
+	}
+}
+
+func TestChunkedUploadNestedRelativePath(t *testing.T) {
+	storage := t.TempDir()
+	rootDir = storage
+	_ = configureStorageRoot(storage)
+	um, err := newUploadManager(filepath.Join(storage, ".dingbap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte("nested folder upload")
+	m, _, err := um.init("inbox", "Album/vacation/photo.jpg", int64(len(payload)), 1024, "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Name != "photo.jpg" {
+		t.Fatalf("name %q", m.Name)
+	}
+	if m.Path != "inbox/Album/vacation" {
+		t.Fatalf("path %q", m.Path)
+	}
+	dir := filepath.Join(rootDir, "inbox", "Album", "vacation")
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("expected nested dirs: %v", err)
+	}
+	if err := um.writeChunk(m.ID, 0, bytes.NewReader(payload), int64(len(payload))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := um.complete(m.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "photo.jpg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("content mismatch")
+	}
+}
+
+func TestChunkedUploadRejectsDotDotInName(t *testing.T) {
+	storage := t.TempDir()
+	rootDir = storage
+	_ = configureStorageRoot(storage)
+	um, err := newUploadManager(filepath.Join(storage, ".dingbap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"../evil.txt", "a/../b.txt", ".hidden/x.txt", "ok/.secret"} {
+		if _, _, err := um.init("", name, 10, 1024, "admin"); err == nil {
+			t.Fatalf("expected reject for %q", name)
+		}
 	}
 }
 

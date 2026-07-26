@@ -33,6 +33,26 @@ func jsonErr(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, jsonResponse{OK: false, Error: msg})
 }
 
+// Max size for JSON API bodies (login, admin mutations, zip path lists, …).
+const maxJSONBodyBytes int64 = 1 << 20 // 1 MiB
+
+// decodeJSONBody decodes r.Body into dst with a hard size limit.
+// On error it writes a JSON error response and returns false.
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBodyBytes)
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(dst); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			jsonErr(w, http.StatusRequestEntityTooLarge, "Request body too large")
+			return false
+		}
+		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+		return false
+	}
+	return true
+}
+
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	if code != http.StatusOK {
@@ -385,6 +405,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, fmt.Sprintf("Uploaded %s", name))
+	auditLog(actorName(r), "upload", name, r)
 	invalidateListingCache()
 }
 
@@ -398,8 +419,7 @@ func handleMkdir(w http.ResponseWriter, r *http.Request) {
 		Path string `json:"path"`
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if isTrashPath(body.Path) || isTrashPath(pathJoin(body.Path, body.Name)) {
@@ -434,6 +454,7 @@ func handleMkdir(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, fmt.Sprintf("Created directory %s", name))
+	auditLog(actorName(r), "mkdir", pathJoin(body.Path, name), r)
 	invalidateListingCache()
 }
 
@@ -447,8 +468,7 @@ func handleRename(w http.ResponseWriter, r *http.Request) {
 		OldPath string `json:"oldPath"`
 		NewName string `json:"newName"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 
@@ -498,6 +518,7 @@ func handleRename(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, fmt.Sprintf("Renamed to %s", newName))
+	auditLog(actorName(r), "rename", newRel, r)
 	invalidateListingCache()
 }
 
@@ -512,8 +533,7 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 		Confirm      bool   `json:"confirm"`
 		ConfirmName  string `json:"confirmName"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 
@@ -571,6 +591,7 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, fmt.Sprintf("Moved %s to trash", item.Name))
+	auditLog(actorName(r), "trash", rel, r)
 	invalidateListingCache()
 }
 
@@ -584,8 +605,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 		Path    string `json:"path"`
 		DestDir string `json:"destDir"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if isTrashPath(body.Path) || isTrashPath(body.DestDir) {
@@ -652,6 +672,7 @@ func handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, fmt.Sprintf("Moved to %s", body.DestDir))
+	auditLog(actorName(r), "move", newRel, r)
 	invalidateListingCache()
 }
 

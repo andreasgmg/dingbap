@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -10,11 +9,19 @@ import (
 
 type ctxKey int
 
-const sessionCtxKey ctxKey = 1
+const (
+	sessionCtxKey ctxKey = 1
+	authViaCtxKey ctxKey = 2
+)
 
 func sessionFromCtx(r *http.Request) *Session {
 	s, _ := r.Context().Value(sessionCtxKey).(*Session)
 	return s
+}
+
+func authViaFromCtx(r *http.Request) string {
+	v, _ := r.Context().Value(authViaCtxKey).(string)
+	return v
 }
 
 func withSession(next http.Handler) http.Handler {
@@ -22,8 +29,28 @@ func withSession(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		if s := sessions.fromRequest(r); s != nil {
-			r = r.WithContext(context.WithValue(r.Context(), sessionCtxKey, s))
+		// Strict CSP; 'unsafe-inline' required for the embedded layout/login scripts & styles.
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; "+
+				"script-src 'unsafe-inline'; style-src 'unsafe-inline'; "+
+				"img-src 'self' blob: data:; media-src 'self' blob:; frame-src 'self'; "+
+				"connect-src 'self'; font-src 'self'; object-src 'none'")
+		var s *Session
+		var via string
+		// Prefer reverse-proxy identity when present (SSO source of truth).
+		if proxy := sessionFromProxy(r); proxy != nil {
+			s = proxy
+			via = "proxy"
+		} else if cookie := sessions.fromRequest(r); cookie != nil {
+			s = cookie
+			via = "session"
+		}
+		if s != nil {
+			ctx := context.WithValue(r.Context(), sessionCtxKey, s)
+			if via != "" {
+				ctx = context.WithValue(ctx, authViaCtxKey, via)
+			}
+			r = r.WithContext(ctx)
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -106,6 +133,7 @@ func handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	execTemplate(w, loginTpl, map[string]any{
 		"Next":       r.URL.Query().Get("next"),
 		"PublicOpen": publicOpen,
+		"ProxyAuth":  proxyAuthEnabled,
 		"Error":      r.URL.Query().Get("error"),
 	})
 }
@@ -143,8 +171,7 @@ func handleLoginAPI(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 
@@ -155,18 +182,7 @@ func handleLoginAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := sessions.create(user.Username, user.Role)
-	if err != nil {
-		jsonErr(w, http.StatusInternalServerError, "Failed to create session")
-		return
-	}
-	sessions.clearFailures(ip)
-	sessions.setCookie(w, id)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":       true,
-		"username": user.Username,
-		"role":     user.Role,
-	})
+	finishLoginAfterPassword(w, r, ip, user)
 }
 
 func handleLogoutAPI(w http.ResponseWriter, r *http.Request) {
@@ -188,6 +204,7 @@ func handleMeAPI(w http.ResponseWriter, r *http.Request) {
 			"ok":            true,
 			"authenticated": false,
 			"publicOpen":    publicOpen,
+			"proxyAuth":     proxyAuthEnabled,
 		})
 		return
 	}
@@ -197,5 +214,8 @@ func handleMeAPI(w http.ResponseWriter, r *http.Request) {
 		"username":      s.Username,
 		"role":          s.Role,
 		"publicOpen":    publicOpen,
+		"totpEnabled":   s.Role == roleAdmin && users.totpEnabled(s.Username),
+		"authVia":       authViaFromCtx(r),
+		"proxyAuth":     proxyAuthEnabled,
 	})
 }

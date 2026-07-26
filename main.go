@@ -1,17 +1,25 @@
 package main
 
 import (
+	"context"
 	"embed"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
+
+// shutdownGrace is how long Shutdown waits for in-flight HTTP handlers
+// (uploads, zip downloads, …) after SIGTERM/SIGINT before forcing close.
+const shutdownGrace = 15 * time.Second
 
 //go:embed layout.html login.html share.html
 var templateFS embed.FS
@@ -69,9 +77,19 @@ func main() {
 	}
 
 	useTLS := *tlsCert != "" && *tlsKey != ""
-	secureCookie := useTLS || envTruthy("COOKIE_SECURE")
-
+	// Secure cookies on by default (localhost still accepts them). Set COOKIE_SECURE=0
+	// only for plain HTTP over a non-localhost address during local testing.
+	secureCookie := true
+	if v := strings.TrimSpace(os.Getenv("COOKIE_SECURE")); v != "" {
+		secureCookie = envTruthy("COOKIE_SECURE")
+	}
+	if useTLS {
+		secureCookie = true
+	}
 	publicOpen = envTruthy("PUBLIC_OPEN")
+	trustProxy = envTruthy("TRUST_PROXY")
+	configureProxyAuth()
+	configureWebDAV()
 	maxUploadBytes = loadMaxUploadBytes()
 
 	storageDir, err := resolveStorageDir(*storageDirFlag)
@@ -113,6 +131,7 @@ func main() {
 	}
 
 	sessions = newSessionManager(filepath.Join(metaDir, "sessions.json"), secureCookie)
+	configureActivityLog(metaDir)
 
 	// Public archive routes
 	publicMux := http.NewServeMux()
@@ -136,6 +155,8 @@ func main() {
 	adminMux.HandleFunc("/admin/rename", handleRename)
 	adminMux.HandleFunc("/admin/delete", handleDelete)
 	adminMux.HandleFunc("/admin/move", handleMove)
+	adminMux.HandleFunc("/admin/copy", handleCopy)
+	adminMux.HandleFunc("/admin/duplicate", handleDuplicate)
 	adminMux.HandleFunc("/admin/bulk/delete", handleBulkDelete)
 	adminMux.HandleFunc("/admin/bulk/move", handleBulkMove)
 	adminMux.HandleFunc("/admin/bulk/zip", handleZip)
@@ -143,6 +164,8 @@ func main() {
 	adminMux.HandleFunc("/admin/share/revoke", handleRevokeShare)
 	adminMux.HandleFunc("/admin/api/tree", handleTree)
 	adminMux.HandleFunc("/admin/api/search", handleSearch)
+	adminMux.HandleFunc("/admin/api/disk", handleDiskUsage)
+	adminMux.HandleFunc("/admin/api/activity", handleActivityList)
 	adminMux.HandleFunc("/admin/api/trash", handleTrashList)
 	adminMux.HandleFunc("/admin/api/shares", handleListShares)
 	adminMux.HandleFunc("/admin/api/users", handleUsersList)
@@ -157,11 +180,21 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/login", handleLoginPage)
 	mux.HandleFunc("/api/login", handleLoginAPI)
+	mux.HandleFunc("/api/login/totp", handleLoginTOTP)
 	mux.HandleFunc("/api/logout", handleLogoutAPI)
 	mux.HandleFunc("/api/me", handleMeAPI)
 	mux.Handle("/api/password", requireCSRF(http.HandlerFunc(handleChangeOwnPassword)))
+	mux.HandleFunc("/api/totp/status", handleTOTPStatus)
+	mux.Handle("/api/totp/begin", requireCSRF(http.HandlerFunc(handleTOTPBegin)))
+	mux.Handle("/api/totp/confirm", requireCSRF(http.HandlerFunc(handleTOTPConfirm)))
+	mux.Handle("/api/totp/disable", requireCSRF(http.HandlerFunc(handleTOTPDisable)))
 	// Public share links — no login required
 	mux.HandleFunc("/s/", handlePublicShare)
+	if webdavEnabled {
+		dav := requireWebDAVAuth(newWebDAVHandler())
+		mux.Handle("/dav", dav)
+		mux.Handle("/dav/", dav)
+	}
 	mux.Handle("/", requireViewerOrOpen(publicMux))
 	mux.Handle("/admin", requireAdmin(requireCSRF(adminMux)))
 	mux.Handle("/admin/", requireAdmin(requireCSRF(adminMux)))
@@ -178,6 +211,9 @@ func main() {
 	log.Printf("App:     %s://localhost%s/", scheme, addr)
 	log.Printf("Login:   %s://localhost%s/login", scheme, addr)
 	log.Printf("Admin:   %s://localhost%s/admin", scheme, addr)
+	if webdavEnabled {
+		log.Printf("WebDAV:  %s://localhost%s/dav/ (read-only, auth required)", scheme, addr)
+	}
 	log.Printf("Storage: %s", storageDir)
 	log.Printf("Upload limit: %d MB", maxUploadBytes>>20)
 	if publicOpen {
@@ -188,8 +224,15 @@ func main() {
 	if !useTLS {
 		log.Printf("WARNING: running without TLS — use -tls-cert/-tls-key for remote access")
 	}
+	if trustProxy {
+		log.Printf("TRUST_PROXY=1 — login rate limit uses X-Real-IP / X-Forwarded-For (proxy must overwrite client values)")
+	} else {
+		log.Printf("TRUST_PROXY off — login rate limit uses RemoteAddr only (set TRUST_PROXY=1 behind a reverse proxy)")
+	}
 	if !secureCookie {
-		log.Printf("Session cookies are not Secure (set COOKIE_SECURE=1 behind HTTPS reverse proxy)")
+		log.Printf("WARNING: session cookies are not Secure (COOKIE_SECURE=0) — only use on trusted local HTTP")
+	} else {
+		log.Printf("Session cookies: Secure=on (set COOKIE_SECURE=0 only for plain local HTTP testing)")
 	}
 
 	// Timeouts: bare ListenAndServe has none (slowloris / stuck clients).
@@ -204,10 +247,53 @@ func main() {
 		MaxHeaderBytes:    1 << 20, // 1 MB
 	}
 
-	if useTLS {
-		log.Fatal(srv.ListenAndServeTLS(*tlsCert, *tlsKey))
+	if err := serveGraceful(srv, useTLS, *tlsCert, *tlsKey); err != nil {
+		log.Fatalf("Server: %v", err)
 	}
-	log.Fatal(srv.ListenAndServe())
+}
+
+// serveGraceful listens until SIGTERM/SIGINT, then stops accepting new
+// connections and drains active handlers for up to shutdownGrace.
+func serveGraceful(srv *http.Server, useTLS bool, certFile, keyFile string) error {
+	listen := func() error {
+		if useTLS {
+			return srv.ListenAndServeTLS(certFile, keyFile)
+		}
+		return srv.ListenAndServe()
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return serveUntilStop(srv, listen, ctx.Done(), shutdownGrace)
+}
+
+// serveUntilStop runs listen until stop is closed or listen returns, then
+// shuts the server down with a grace period for in-flight handlers.
+func serveUntilStop(srv *http.Server, listen func() error, stop <-chan struct{}, grace time.Duration) error {
+	errCh := make(chan error, 1)
+	go func() { errCh <- listen() }()
+
+	select {
+	case err := <-errCh:
+		if err == nil || errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case <-stop:
+		log.Printf("Shutdown signal received — draining up to %s for active streams", grace)
+		shutCtx, cancel := context.WithTimeout(context.Background(), grace)
+		defer cancel()
+		if err := srv.Shutdown(shutCtx); err != nil {
+			log.Printf("Graceful drain timed out: %v — forcing close", err)
+			_ = srv.Close()
+		} else {
+			log.Printf("Shutdown complete")
+		}
+		err := <-errCh
+		if err == nil || errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	}
 }
 
 func bootstrapUsers(store *userStore) error {

@@ -4,8 +4,10 @@
 #   export ADMIN_PASS='choose-a-long-random-password'
 #   docker compose up -d --build
 #
-# For real HTTPS, put Caddy/nginx in front and keep COOKIE_SECURE=1.
-# For local HTTP-only testing, set COOKIE_SECURE=0.
+# For real HTTPS, put Caddy/nginx in front (Secure cookies are on by default).
+# TRUST_PROXY defaults to 1 in Compose (proxy overwrites X-Forwarded-For / X-Real-IP).
+# Optional SSO: PROXY_AUTH=1 (requires TRUST_PROXY) + create matching local users.
+# For unusual plain-HTTP LAN testing only: COOKIE_SECURE=0
 
 services:
   dingbap:
@@ -13,6 +15,8 @@ services:
     image: dingbap:local
     container_name: dingbap
     restart: unless-stopped
+    # Give the process time to drain uploads/zips after SIGTERM (app waits 15s).
+    stop_grace_period: 20s
     ports:
       - "8080:8080"
     environment:
@@ -23,6 +27,9 @@ services:
       VIEWER_PASS: ${VIEWER_PASS:-}
       PUBLIC_OPEN: ${PUBLIC_OPEN:-0}
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      PROXY_AUTH: ${PROXY_AUTH:-0}
+      WEBDAV: ${WEBDAV:-0}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-500}
     volumes:
       - dingbap-data:/data

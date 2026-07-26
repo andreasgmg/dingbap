@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +28,7 @@ type Session struct {
 
 type sessionManager struct {
 	mu           sync.RWMutex
+	persistMu    sync.Mutex // serializes disk writes; each write re-snapshots under mu
 	sessions     map[string]*Session
 	path         string // sessions.json path; empty = memory-only (tests)
 	secureCookie bool
@@ -95,11 +95,15 @@ func (sm *sessionManager) load() error {
 	return nil
 }
 
-// persist writes sessions.json atomically. Call without holding sm.mu.
+// persist writes sessions.json atomically. Concurrent callers are serialized;
+// each write re-snapshots the map so a slower writer cannot clobber a newer state.
 func (sm *sessionManager) persist() {
 	if sm.path == "" {
 		return
 	}
+	sm.persistMu.Lock()
+	defer sm.persistMu.Unlock()
+
 	sm.mu.RLock()
 	f := sessionsFile{Sessions: make(map[string]Session, len(sm.sessions))}
 	now := time.Now()
@@ -116,18 +120,8 @@ func (sm *sessionManager) persist() {
 		log.Printf("Warning: marshal sessions: %v", err)
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(sm.path), 0700); err != nil {
-		log.Printf("Warning: sessions dir: %v", err)
-		return
-	}
-	tmp := sm.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
+	if err := writeFileAtomic(sm.path, data, 0600); err != nil {
 		log.Printf("Warning: write sessions: %v", err)
-		return
-	}
-	if err := os.Rename(tmp, sm.path); err != nil {
-		log.Printf("Warning: rename sessions: %v", err)
-		_ = os.Remove(tmp)
 	}
 }
 
@@ -306,12 +300,48 @@ func (sm *sessionManager) clearFailures(ip string) {
 	sm.mu.Unlock()
 }
 
+// trustProxy, when true, lets clientIP honor X-Real-IP / X-Forwarded-For.
+// Only enable behind a reverse proxy that overwrites client-supplied values
+// (TRUST_PROXY=1). Default false avoids IP spoofing when the app is exposed raw.
+var trustProxy bool
+
+// clientIP returns the client address for rate limiting.
+// With TRUST_PROXY=1: X-Real-IP, then leftmost X-Forwarded-For, then RemoteAddr.
+// Otherwise: RemoteAddr only.
 func clientIP(r *http.Request) string {
+	if trustProxy {
+		if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
+			if ip := parseIPHost(xri); ip != "" {
+				return ip
+			}
+		}
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			first := strings.TrimSpace(strings.Split(xff, ",")[0])
+			if ip := parseIPHost(first); ip != "" {
+				return ip
+			}
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+func parseIPHost(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	// Allow "ip" or "ip:port"
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		s = host
+	}
+	if net.ParseIP(s) == nil {
+		return ""
+	}
+	return s
 }
 
 func randomToken(n int) (string, error) {

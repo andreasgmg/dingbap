@@ -76,11 +76,7 @@ func (s *trashStore) saveLocked() error {
 	if err != nil {
 		return err
 	}
-	tmp := s.metaPath() + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.metaPath())
+	return writeFileAtomic(s.metaPath(), data, 0600)
 }
 
 func isTrashPath(rel string) bool {
@@ -320,8 +316,7 @@ func handleTrashRestore(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ID string `json:"id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	path, err := trash.restore(body.ID)
@@ -336,6 +331,7 @@ func handleTrashRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, fmt.Sprintf("Restored to %s", path))
+	auditLog(actorName(r), "trash_restore", path, r)
 	invalidateListingCache()
 }
 
@@ -347,8 +343,7 @@ func handleTrashPurge(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ID string `json:"id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if err := trash.purge(body.ID); err != nil {
@@ -356,6 +351,7 @@ func handleTrashPurge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, "Permanently deleted")
+	auditLog(actorName(r), "trash_purge", body.ID, r)
 	invalidateListingCache()
 }
 
@@ -367,7 +363,10 @@ func handleTrashEmpty(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Confirm bool `json:"confirm"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || !body.Confirm {
+	if !decodeJSONBody(w, r, &body) {
+		return
+	}
+	if !body.Confirm {
 		jsonErr(w, http.StatusBadRequest, "Empty trash requires confirmation")
 		return
 	}
@@ -377,5 +376,6 @@ func handleTrashEmpty(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, fmt.Sprintf("Emptied trash (%d item(s))", n))
+	auditLog(actorName(r), "trash_empty", "", r)
 	invalidateListingCache()
 }

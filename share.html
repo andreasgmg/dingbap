@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{if .NotFound}}Link unavailable{{else if .NeedPass}}Unlock · {{.Name}}{{else}}{{.Name}}{{end}} · dingbap</title>
+<title>{{if .NotFound}}Link unavailable{{else if .NeedPass}}Unlock · {{.Name}}{{else if .IsDrop}}Drop · {{.Name}}{{else}}{{.Name}}{{end}} · dingbap</title>
 <style>
-:root{--bg:#0f1419;--panel:#1a222c;--border:#2a3544;--text:#e7eef7;--muted:#8b9bb0;--accent:#3d8bfd;--danger:#e85d5d;--hover:#243041}
+:root{--bg:#0f1419;--panel:#1a222c;--border:#2a3544;--text:#e7eef7;--muted:#8b9bb0;--accent:#3d8bfd;--danger:#e85d5d;--ok:#3fb950;--hover:#243041}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1200px 600px at 20% -10%,#1a2a44 0%,var(--bg) 55%);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 .wrap{width:min(720px,92vw);margin:3rem auto;padding:0 0 3rem}
@@ -15,11 +15,13 @@ h1{font-size:1.15rem;font-weight:650;margin-bottom:.35rem;word-break:break-word}
 .sub{color:var(--muted);font-size:.85rem;margin-bottom:1.1rem;line-height:1.45}
 .meta{color:var(--muted);font-size:.8rem;margin:-.5rem 0 1rem}
 .err{background:rgba(232,93,93,.12);border:1px solid rgba(232,93,93,.35);color:#ffb4b4;padding:.65rem .75rem;border-radius:8px;font-size:.82rem;margin-bottom:.9rem}
+.okmsg{background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.35);color:#8fef9a;padding:.65rem .75rem;border-radius:8px;font-size:.82rem;margin-bottom:.9rem}
 label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:.35rem}
-input[type=password]{width:100%;padding:.7rem .8rem;border-radius:8px;border:1px solid var(--border);background:#121820;color:var(--text);font-size:.9rem;margin-bottom:.9rem}
+input[type=password],input[type=file]{width:100%;padding:.7rem .8rem;border-radius:8px;border:1px solid var(--border);background:#121820;color:var(--text);font-size:.9rem;margin-bottom:.9rem}
 input:focus{outline:none;border-color:var(--accent)}
 button,.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem .95rem;border-radius:8px;border:1px solid var(--border);background:var(--accent);color:#fff;font-size:.85rem;font-weight:560;cursor:pointer;text-decoration:none;font-family:inherit}
 button:hover,.btn:hover{filter:brightness(1.08)}
+button:disabled{opacity:.55;cursor:not-allowed}
 .btn.secondary{background:#243041;color:var(--text)}
 .actions{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
 .list{list-style:none;border:1px solid var(--border);border-radius:10px;overflow:hidden}
@@ -33,15 +35,37 @@ button:hover,.btn:hover{filter:brightness(1.08)}
 .up a{color:var(--muted);font-size:.82rem;text-decoration:none}
 .up a:hover{color:var(--accent)}
 .empty{color:var(--muted);font-size:.88rem;padding:1.2rem 0}
+.dropzone{position:relative;display:block;border:1.5px dashed var(--border);border-radius:12px;padding:2rem 1.25rem;text-align:center;color:var(--muted);font-size:.88rem;margin-bottom:1rem;background:#121820;cursor:pointer;transition:border-color .15s,background .15s,color .15s,transform .15s;overflow:hidden}
+.dropzone:hover,.dropzone.dragover{border-color:var(--accent);color:var(--text);background:rgba(61,139,253,.08)}
+.dropzone.dragover{border-style:solid;transform:scale(1.01)}
+.dropzone .dz-icon{font-size:1.75rem;line-height:1;margin-bottom:.55rem;opacity:.7;pointer-events:none}
+.dropzone .dz-title{color:var(--text);font-size:.95rem;font-weight:560;margin-bottom:.3rem;pointer-events:none}
+.dropzone .dz-hint{font-size:.78rem;line-height:1.4;pointer-events:none}
+.dropzone > input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0;border:0;border-radius:12px;font-size:0;background:transparent;z-index:2}
+.drop-queue{display:flex;flex-direction:column;gap:.55rem;margin-top:.25rem;min-height:0}
+.drop-item{background:#121820;border:1px solid var(--border);border-radius:10px;padding:.7rem .85rem}
+.drop-item.done{border-color:rgba(63,185,80,.4)}
+.drop-item.err{border-color:rgba(232,93,93,.45)}
+.drop-item-top{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;margin-bottom:.45rem}
+.drop-item-name{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.drop-item-meta{font-size:.72rem;color:var(--muted);flex-shrink:0}
+.drop-item.done .drop-item-meta{color:var(--ok)}
+.drop-item.err .drop-item-meta{color:var(--danger)}
+.drop-bar{height:5px;background:#1a222c;border-radius:3px;overflow:hidden}
+.drop-bar > i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .12s ease-out;font-style:normal}
+.drop-item.done .drop-bar > i{background:var(--ok)}
+.drop-item.err .drop-bar > i{background:var(--danger)}
+.drop-footer{margin-top:1rem;font-size:.75rem;color:var(--muted);line-height:1.4}
+.drop-status{font-size:.75rem;color:var(--muted);margin:0 0 .75rem;min-height:1em}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="brand">dingbap share</div>
+  <div class="brand">dingbap {{if .IsDrop}}drop{{else}}share{{end}}</div>
   <div class="card">
     {{if .NotFound}}
       <h1>Link expired or not found</h1>
-      <p class="sub">{{if .Error}}{{.Error}}{{else}}This share is no longer available. It may have expired, reached its download limit, been revoked, or the file was removed.{{end}}</p>
+      <p class="sub">{{if .Error}}{{.Error}}{{else}}This share is no longer available. It may have expired, reached its limit, been revoked, or the file was removed.{{end}}</p>
     {{else if .NeedPass}}
       <h1>{{.Name}}</h1>
       <p class="sub">This link is password-protected.</p>
@@ -51,6 +75,187 @@ button:hover,.btn:hover{filter:brightness(1.08)}
         <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
         <button type="submit">Unlock</button>
       </form>
+    {{else if .IsDrop}}
+      <h1>{{.Name}}</h1>
+      <p class="sub">Send files here. The link owner receives them — you won’t see what’s already in the folder.</p>
+      {{if .MaxSizeMB}}<p class="meta">Max {{.MaxSizeMB}} MB per file</p>{{end}}
+      {{if .Error}}<div class="err" id="dropFlashErr">{{.Error}}</div>{{end}}
+      {{if .Message}}<div class="okmsg" id="dropFlashOk">{{.Message}}</div>{{end}}
+      <p class="drop-status" id="dropStatus"></p>
+      <div class="dropzone" id="dropZone"
+           data-upload-url="/s/{{.Token}}/upload"
+           data-max-mb="{{.MaxSizeMB}}">
+        <input type="file" id="file" name="file" multiple>
+        <div class="dz-icon" aria-hidden="true">↑</div>
+        <div class="dz-title">Drop files here</div>
+        <div class="dz-hint">or click to browse · multiple files ok</div>
+      </div>
+      <div class="drop-queue" id="dropQueue" aria-live="polite"></div>
+      <p class="drop-footer">Uploads go straight to the owner. This page never lists existing files.</p>
+      <script>
+      (function () {
+        var zone = document.getElementById('dropZone');
+        var input = document.getElementById('file');
+        var queue = document.getElementById('dropQueue');
+        var statusEl = document.getElementById('dropStatus');
+        if (!zone || !input || !queue) return;
+
+        var uploadURL = zone.getAttribute('data-upload-url') || '';
+        var maxBytes = (parseInt(zone.getAttribute('data-max-mb') || '0', 10) || 0) * 1024 * 1024;
+        var busy = false;
+
+        function setStatus(msg) {
+          if (statusEl) statusEl.textContent = msg || '';
+        }
+        setStatus('Ready to upload');
+
+        function toastClear() {
+          var err = document.getElementById('dropFlashErr');
+          var ok = document.getElementById('dropFlashOk');
+          if (err) err.parentNode.removeChild(err);
+          if (ok) ok.parentNode.removeChild(ok);
+        }
+
+        function fmtSize(n) {
+          if (n < 1024) return n + ' B';
+          if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+          return (n / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function addItem(file) {
+          var el = document.createElement('div');
+          el.className = 'drop-item';
+          var top = document.createElement('div');
+          top.className = 'drop-item-top';
+          var name = document.createElement('span');
+          name.className = 'drop-item-name';
+          name.textContent = file.name + ' · ' + fmtSize(file.size);
+          var meta = document.createElement('span');
+          meta.className = 'drop-item-meta';
+          meta.textContent = 'Waiting';
+          top.appendChild(name);
+          top.appendChild(meta);
+          var bar = document.createElement('div');
+          bar.className = 'drop-bar';
+          var fill = document.createElement('i');
+          bar.appendChild(fill);
+          el.appendChild(top);
+          el.appendChild(bar);
+          if (queue.firstChild) queue.insertBefore(el, queue.firstChild);
+          else queue.appendChild(el);
+          return el;
+        }
+
+        function setProgress(el, ratio, meta) {
+          var pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+          el.querySelector('.drop-bar > i').style.width = pct + '%';
+          if (meta) el.querySelector('.drop-item-meta').textContent = meta;
+        }
+
+        function uploadOne(file) {
+          var el = addItem(file);
+          if (maxBytes > 0 && file.size > maxBytes) {
+            el.className += ' err';
+            setProgress(el, 1, 'Too large');
+            return Promise.resolve();
+          }
+          if (!uploadURL) {
+            el.className += ' err';
+            setProgress(el, 1, 'Missing upload URL');
+            return Promise.resolve();
+          }
+          return new Promise(function (resolve) {
+            var fd = new FormData();
+            fd.append('file', file, file.name);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadURL);
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.upload.onprogress = function (e) {
+              if (!e.lengthComputable) return;
+              var r = e.loaded / e.total;
+              setProgress(el, r, Math.round(r * 100) + '%');
+            };
+            xhr.onload = function () {
+              var data = null;
+              try { data = JSON.parse(xhr.responseText); } catch (err) {}
+              if (xhr.status >= 200 && xhr.status < 300 && data && data.ok) {
+                el.className += ' done';
+                setProgress(el, 1, 'Done');
+              } else {
+                el.className += ' err';
+                var msg = (data && data.error) ? data.error : ('Failed (' + xhr.status + ')');
+                setProgress(el, 1, msg);
+              }
+              resolve();
+            };
+            xhr.onerror = function () {
+              el.className += ' err';
+              setProgress(el, 1, 'Network error');
+              resolve();
+            };
+            setProgress(el, 0, '0%');
+            xhr.send(fd);
+          });
+        }
+
+        function uploadFiles(fileList) {
+          if (!fileList || !fileList.length) {
+            setStatus('No file selected');
+            return;
+          }
+          if (busy) {
+            setStatus('Upload already in progress');
+            return;
+          }
+          var files = [];
+          for (var i = 0; i < fileList.length; i++) files.push(fileList[i]);
+          busy = true;
+          toastClear();
+          setStatus('Uploading ' + files.length + ' file' + (files.length === 1 ? '' : 's') + '…');
+          zone.classList.add('dragover');
+          var chain = Promise.resolve();
+          files.forEach(function (f) {
+            chain = chain.then(function () { return uploadOne(f); });
+          });
+          chain.then(function () {
+            busy = false;
+            zone.classList.remove('dragover');
+            input.value = '';
+            setStatus('Finished — you can send more files');
+          }, function () {
+            busy = false;
+            zone.classList.remove('dragover');
+            input.value = '';
+            setStatus('Upload failed');
+          });
+        }
+
+        input.addEventListener('change', function () {
+          uploadFiles(input.files);
+        });
+        zone.addEventListener('dragenter', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.classList.add('dragover');
+        });
+        zone.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.classList.add('dragover');
+        });
+        zone.addEventListener('dragleave', function (e) {
+          if (!zone.contains(e.relatedTarget)) zone.classList.remove('dragover');
+        });
+        zone.addEventListener('drop', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.classList.remove('dragover');
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+            uploadFiles(e.dataTransfer.files);
+          }
+        });
+      })();
+      </script>
     {{else if .IsDir}}
       <h1>{{.Name}}</h1>
       <p class="sub">Shared folder</p>

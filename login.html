@@ -78,6 +78,8 @@ button{
 }
 button:hover{background:var(--accent-hover)}
 button:disabled{opacity:.6;cursor:not-allowed}
+button.secondary{background:transparent;border:1px solid var(--border);color:var(--text-secondary);margin-top:.5rem}
+button.secondary:hover{color:var(--text-primary);border-color:var(--text-muted)}
 .error{
   background:var(--danger-bg);
   color:var(--danger);
@@ -92,6 +94,7 @@ button:disabled{opacity:.6;cursor:not-allowed}
 .footer{margin-top:1.25rem;text-align:center;font-size:.8rem;color:var(--text-muted)}
 .footer a{color:var(--accent);text-decoration:none}
 .footer a:hover{color:var(--accent-hover)}
+.hidden{display:none}
 </style>
 </head>
 <body>
@@ -105,14 +108,25 @@ button:disabled{opacity:.6;cursor:not-allowed}
     <svg class="icon" aria-hidden="true"><use href="#i-hard-drive"></use></svg>
     <h1>dingbap</h1>
   </div>
-  <p class="sub">Sign in to continue</p>
+  <p class="sub" id="subtitle">Sign in to continue</p>
+  {{if .ProxyAuth}}
+  <p class="sub" style="margin-top:-.75rem;margin-bottom:1.25rem;font-size:.8rem">SSO via your reverse proxy is enabled. Local password login remains available as a break-glass option.</p>
+  {{end}}
   <div class="error" id="error"></div>
   <form id="loginForm" autocomplete="on">
-    <label for="username">Username</label>
-    <input type="text" id="username" name="username" autocomplete="username" required autofocus>
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password" autocomplete="current-password" required>
-    <button type="submit" id="submitBtn">Sign in</button>
+    <div id="stepPassword">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <button type="submit" id="submitBtn">Sign in</button>
+    </div>
+    <div id="stepTotp" class="hidden">
+      <label for="totpCode">Authenticator code</label>
+      <input type="text" id="totpCode" name="totp" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code or recovery code">
+      <button type="submit" id="totpBtn">Verify</button>
+      <button type="button" class="secondary" id="totpBack">Back</button>
+    </div>
   </form>
   {{if .PublicOpen}}
   <p class="footer"><a href="/">Continue without signing in</a></p>
@@ -124,10 +138,76 @@ const next = {{printf "%q" .Next}};
 const form = document.getElementById('loginForm');
 const errEl = document.getElementById('error');
 const btn = document.getElementById('submitBtn');
+const totpBtn = document.getElementById('totpBtn');
+let pendingToken = '';
+
+function showError(msg) {
+  errEl.textContent = msg;
+  errEl.classList.add('show');
+}
+
+function clearError() {
+  errEl.classList.remove('show');
+}
+
+function goTotpStep(token) {
+  pendingToken = token;
+  document.getElementById('stepPassword').classList.add('hidden');
+  document.getElementById('stepTotp').classList.remove('hidden');
+  document.getElementById('subtitle').textContent = 'Enter your authenticator code';
+  document.getElementById('totpCode').value = '';
+  document.getElementById('totpCode').focus();
+}
+
+function goPasswordStep() {
+  pendingToken = '';
+  document.getElementById('stepTotp').classList.add('hidden');
+  document.getElementById('stepPassword').classList.remove('hidden');
+  document.getElementById('subtitle').textContent = 'Sign in to continue';
+  btn.disabled = false;
+  totpBtn.disabled = false;
+}
+
+function redirectAfterLogin(data) {
+  let dest = next;
+  if (!dest || !dest.startsWith('/') || dest.startsWith('//') ||
+      (dest.startsWith('/admin') && data.role !== 'admin')) {
+    dest = data.role === 'admin' ? '/admin' : '/';
+  }
+  location.href = dest;
+}
+
+document.getElementById('totpBack').addEventListener('click', goPasswordStep);
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  errEl.classList.remove('show');
+  clearError();
+  if (pendingToken) {
+    totpBtn.disabled = true;
+    try {
+      const res = await fetch('/api/login/totp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pending_token: pendingToken,
+          code: document.getElementById('totpCode').value.trim()
+        })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        if (data.pending_token) pendingToken = data.pending_token;
+        showError(data.error || 'Invalid code');
+        totpBtn.disabled = false;
+        return;
+      }
+      redirectAfterLogin(data);
+    } catch (_) {
+      showError('Could not reach the server');
+      totpBtn.disabled = false;
+    }
+    return;
+  }
+
   btn.disabled = true;
   try {
     const res = await fetch('/api/login', {
@@ -140,20 +220,18 @@ form.addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (!data.ok) {
-      errEl.textContent = data.error || 'Sign-in failed';
-      errEl.classList.add('show');
+      showError(data.error || 'Sign-in failed');
       btn.disabled = false;
       return;
     }
-    let dest = next;
-    if (!dest || !dest.startsWith('/') || dest.startsWith('//') ||
-        (dest.startsWith('/admin') && data.role !== 'admin')) {
-      dest = data.role === 'admin' ? '/admin' : '/';
+    if (data.totp_required && data.pending_token) {
+      goTotpStep(data.pending_token);
+      btn.disabled = false;
+      return;
     }
-    location.href = dest;
+    redirectAfterLogin(data);
   } catch (err) {
-    errEl.textContent = 'Could not reach the server';
-    errEl.classList.add('show');
+    showError('Could not reach the server');
     btn.disabled = false;
   }
 });

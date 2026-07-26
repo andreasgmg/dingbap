@@ -96,6 +96,11 @@ func compressibleContentType(ct string) bool {
 
 func withGzip(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// WebDAV clients are picky about Content-Encoding on PROPFIND/GET.
+		if strings.HasPrefix(r.URL.Path, "/dav") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if r.Method == http.MethodHead || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			next.ServeHTTP(w, r)
 			return

@@ -94,4 +94,5 @@ func (c *listingCache) len() int {
 
 func invalidateListingCache() {
 	dirCache.invalidate()
+	invalidateDiskUsageCache()
 }

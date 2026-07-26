@@ -18,7 +18,7 @@ func TestShareCreateAndResolve(t *testing.T) {
 	}
 	shares = store
 
-	sh, err := store.create("doc.txt", "admin", shareExpiry24h, "")
+	sh, err := store.create("doc.txt", "admin", shareExpiry24h, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,18 +62,57 @@ func TestShareOneDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sh, err := store.create("once.bin", "admin", shareExpiry1Download, "")
+	sh, err := store.create("once.bin", "admin", shareExpiry1Download, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if sh.MaxDownloads != 1 {
 		t.Fatal("expected max 1")
 	}
-	if err := store.recordDownload(sh.Token); err != nil {
+	if err := store.beginDownload(sh.Token); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.getValid(sh.Token); err == nil {
 		t.Fatal("expected share gone after one download")
+	}
+	if err := store.beginDownload(sh.Token); err == nil {
+		t.Fatal("second beginDownload must fail")
+	}
+}
+
+func TestShareBeginDownloadSerializesQuota(t *testing.T) {
+	root := t.TempDir()
+	rootDir = root
+	if err := configureStorageRoot(root); err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(root, "once.bin"), "x")
+	store, err := openShareStore(filepath.Join(t.TempDir(), "shares.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sh, err := store.create("once.bin", "admin", shareExpiry1Download, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const n = 20
+	errs := make(chan error, n)
+	for i := 0; i < n; i++ {
+		go func() {
+			errs <- store.beginDownload(sh.Token)
+		}()
+	}
+	ok, fail := 0, 0
+	for i := 0; i < n; i++ {
+		if err := <-errs; err == nil {
+			ok++
+		} else {
+			fail++
+		}
+	}
+	if ok != 1 || fail != n-1 {
+		t.Fatalf("ok=%d fail=%d want 1 success and %d failures", ok, fail, n-1)
 	}
 }
 
@@ -85,7 +124,7 @@ func TestShareExpired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sh, err := store.create("old.txt", "admin", shareExpiry24h, "")
+	sh, err := store.create("old.txt", "admin", shareExpiry24h, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -142,6 +142,94 @@ func mustAbs(t *testing.T, path string) string {
 	return resolved
 }
 
+func TestResolveUnderRoot_DeniesHiddenSegments(t *testing.T) {
+	root := t.TempDir()
+	mustMkdir(t, filepath.Join(root, ".dingbap"))
+	mustWrite(t, filepath.Join(root, ".dingbap", "users.json"), `{"users":[]}`)
+	mustMkdir(t, filepath.Join(root, ".trash", "items", "abc"))
+	mustWrite(t, filepath.Join(root, ".trash", "items", "abc", "secret.txt"), "deleted")
+	mustMkdir(t, filepath.Join(root, "docs", ".hidden"))
+	mustWrite(t, filepath.Join(root, "docs", ".hidden", "x.txt"), "nope")
+	mustWrite(t, filepath.Join(root, "docs", "ok.txt"), "yes")
+
+	denied := []string{
+		".dingbap",
+		".dingbap/users.json",
+		".dingbap/sessions.json",
+		".trash",
+		".trash/trash_info.json",
+		".trash/items/abc/secret.txt",
+		"docs/.hidden",
+		"docs/.hidden/x.txt",
+		"/.dingbap/users.json",
+		"docs/../.dingbap/users.json",
+	}
+	for _, req := range denied {
+		t.Run("deny_"+req, func(t *testing.T) {
+			got, err := resolveUnderRoot(root, req)
+			if err == nil {
+				t.Fatalf("expected deny, got %q", got)
+			}
+		})
+	}
+
+	got, err := resolveUnderRoot(root, "docs/ok.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(got) != "ok.txt" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestResolveUnderRoot_DeniesSymlinkIntoHidden(t *testing.T) {
+	root := t.TempDir()
+	mustMkdir(t, filepath.Join(root, ".dingbap"))
+	mustWrite(t, filepath.Join(root, ".dingbap", "users.json"), `{}`)
+	mustMkdir(t, filepath.Join(root, ".trash", "items"))
+	if err := os.Symlink(filepath.Join(root, ".dingbap"), filepath.Join(root, "evil")); err != nil {
+		t.Skipf("symlinks not available: %v", err)
+	}
+	if err := os.Symlink(filepath.Join(root, ".trash"), filepath.Join(root, "bin")); err != nil {
+		t.Skipf("symlinks not available: %v", err)
+	}
+
+	for _, req := range []string{"evil", "evil/users.json", "bin", "bin/items"} {
+		if _, err := resolveUnderRoot(root, req); err == nil {
+			t.Fatalf("expected deny for symlink into hidden via %q", req)
+		}
+	}
+
+	// Symlink to a normal folder still works.
+	mustMkdir(t, filepath.Join(root, "real"))
+	mustWrite(t, filepath.Join(root, "real", "a.txt"), "ok")
+	if err := os.Symlink(filepath.Join(root, "real"), filepath.Join(root, "link")); err != nil {
+		t.Skipf("symlinks not available: %v", err)
+	}
+	got, err := resolveUnderRoot(root, "link/a.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(got) != "a.txt" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestSafePathDeniesMetaEvenWhenRootConfigured(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, ".dingbap", "users.json"), "{}")
+	rootDir = root
+	if err := configureStorageRoot(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := safePath(".dingbap/users.json"); err == nil {
+		t.Fatal("safePath must deny .dingbap")
+	}
+	if _, err := assertUserContentPath(".trash/items/x"); err == nil {
+		t.Fatal("assertUserContentPath must deny .trash")
+	}
+}
+
 func TestConfigureStorageRootCachesEval(t *testing.T) {
 	root := t.TempDir()
 	if err := configureStorageRoot(root); err != nil {
@@ -156,3 +244,4 @@ func TestConfigureStorageRootCachesEval(t *testing.T) {
 		t.Fatalf("got %q cached %q ok=%v", got, want, ok)
 	}
 }
+

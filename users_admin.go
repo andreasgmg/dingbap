@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 )
@@ -27,8 +26,7 @@ func handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 		Role     string `json:"role"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if body.Role == "" {
@@ -39,6 +37,7 @@ func handleUsersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, "User created")
+	auditLog(actorName(r), "user_create", body.Username, r)
 }
 
 func handleUsersDelete(w http.ResponseWriter, r *http.Request) {
@@ -49,8 +48,7 @@ func handleUsersDelete(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Username string `json:"username"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if s := sessionFromCtx(r); s != nil && strings.EqualFold(s.Username, body.Username) {
@@ -65,6 +63,7 @@ func handleUsersDelete(w http.ResponseWriter, r *http.Request) {
 		sessions.destroyByUsername(body.Username)
 	}
 	jsonOK(w, "User deleted")
+	auditLog(actorName(r), "user_delete", body.Username, r)
 }
 
 func handleUsersSetPassword(w http.ResponseWriter, r *http.Request) {
@@ -76,8 +75,7 @@ func handleUsersSetPassword(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if err := users.setPassword(body.Username, body.Password); err != nil {
@@ -88,6 +86,7 @@ func handleUsersSetPassword(w http.ResponseWriter, r *http.Request) {
 		sessions.destroyByUsername(body.Username)
 	}
 	jsonOK(w, "Password updated — user must sign in again")
+	auditLog(actorName(r), "user_password", body.Username, r)
 }
 
 func handleUsersSetRole(w http.ResponseWriter, r *http.Request) {
@@ -99,8 +98,7 @@ func handleUsersSetRole(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Role     string `json:"role"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if s := sessionFromCtx(r); s != nil && strings.EqualFold(s.Username, body.Username) && body.Role != roleAdmin {
@@ -115,6 +113,7 @@ func handleUsersSetRole(w http.ResponseWriter, r *http.Request) {
 		sessions.destroyByUsername(body.Username)
 	}
 	jsonOK(w, "Role updated")
+	auditLog(actorName(r), "user_role", body.Username, r)
 }
 
 // handleChangeOwnPassword lets any logged-in user change their password.
@@ -132,8 +131,7 @@ func handleChangeOwnPassword(w http.ResponseWriter, r *http.Request) {
 		CurrentPassword string `json:"current_password"`
 		NewPassword     string `json:"new_password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "Invalid JSON")
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	if _, err := users.authenticate(s.Username, body.CurrentPassword); err != nil {
